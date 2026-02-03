@@ -76,6 +76,42 @@
 
                 <div class="files-list" id="filesList"></div>
 
+                <!-- Additional Options Accordion -->
+                <div class="options-accordion">
+                    <button class="accordion-header" id="accordionToggle">
+                        <span class="accordion-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Additional Options
+                        </span>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <div class="accordion-content" id="accordionContent">
+                        <div class="option-group">
+                            <label class="toggle-label">
+                                <span class="toggle-text">
+                                    <span class="toggle-title">Select specific pages from PDFs</span>
+                                    <span class="toggle-hint">Choose which pages to include from each PDF</span>
+                                </span>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="enablePageSelection">
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="option-group">
+                            <label for="outputFilename" class="input-label">Output filename</label>
+                            <input type="text" id="outputFilename" class="text-input" placeholder="MergedPDF_20260203">
+                            <p class="input-hint">Default format: MergedPDF_YYYYMMDD (.pdf will be added automatically)</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="action-buttons">
                     <button class="secondary-button" id="clearButton">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -111,13 +147,35 @@
                     </div>
                     <div class="info-card">
                         <div class="info-number">2</div>
-                        <h4>Arrange Order</h4>
-                        <p>Drag files to reorder them as needed</p>
+                        <h4>Arrange & Select</h4>
+                        <p>Drag to reorder files and optionally select specific pages</p>
                     </div>
                     <div class="info-card">
                         <div class="info-number">3</div>
                         <h4>Merge</h4>
                         <p>Click merge and download your combined PDF</p>
+                    </div>
+                </div>
+
+                <div class="page-selection-guide">
+                    <h4>Page Selection Format</h4>
+                    <div class="format-examples">
+                        <div class="format-item">
+                            <code>2-5</code>
+                            <span>Pages 2 through 5</span>
+                        </div>
+                        <div class="format-item">
+                            <code>2,5,6,7</code>
+                            <span>Individual pages 2, 5, 6, and 7</span>
+                        </div>
+                        <div class="format-item">
+                            <code>2-5,7,9</code>
+                            <span>Pages 2-5 plus pages 7 and 9</span>
+                        </div>
+                        <div class="format-item">
+                            <code>1,3-6,10</code>
+                            <span>Page 1, pages 3-6, and page 10</span>
+                        </div>
                     </div>
                 </div>
             </div>

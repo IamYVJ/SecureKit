@@ -16,6 +16,27 @@ const addMoreButton = document.getElementById('addMoreButton');
 const clearButton = document.getElementById('clearButton');
 const mergeButton = document.getElementById('mergeButton');
 const processingSection = document.getElementById('processingSection');
+const enablePageSelection = document.getElementById('enablePageSelection');
+const outputFilename = document.getElementById('outputFilename');
+const accordionToggle = document.getElementById('accordionToggle');
+const accordionContent = document.getElementById('accordionContent');
+
+// Set default filename
+function getDefaultFilename() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `MergedPDF_${year}${month}${day}`;
+}
+
+outputFilename.value = getDefaultFilename();
+
+// Accordion Toggle
+accordionToggle.addEventListener('click', () => {
+    accordionToggle.classList.toggle('active');
+    accordionContent.classList.toggle('active');
+});
 
 // Event Listeners
 browseButton.addEventListener('click', () => fileInput.click());
@@ -29,6 +50,17 @@ fileInput.addEventListener('change', handleFileSelect);
 addMoreButton.addEventListener('click', () => fileInput.click());
 clearButton.addEventListener('click', clearAllFiles);
 mergeButton.addEventListener('click', mergePDFs);
+
+enablePageSelection.addEventListener('change', (e) => {
+    const pageInputs = document.querySelectorAll('.page-selection-wrapper');
+    pageInputs.forEach(input => {
+        if (e.target.checked) {
+            input.classList.add('active');
+        } else {
+            input.classList.remove('active');
+        }
+    });
+});
 
 // Drag and Drop for Upload Area
 uploadArea.addEventListener('dragover', (e) => {
@@ -57,15 +89,27 @@ function handleFileSelect(e) {
 }
 
 // Add Files
-function addFiles(files) {
-    files.forEach(file => {
-        selectedFiles.push({
-            id: Date.now() + Math.random(),
-            file: file,
-            name: file.name,
-            size: formatFileSize(file.size)
-        });
-    });
+async function addFiles(files) {
+    for (const file of files) {
+        try {
+            // Load PDF to get page count
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await PDFDocument.load(arrayBuffer);
+            const pageCount = pdf.getPageCount();
+
+            selectedFiles.push({
+                id: Date.now() + Math.random(),
+                file: file,
+                name: file.name,
+                size: formatFileSize(file.size),
+                pageCount: pageCount,
+                pageSelection: ''
+            });
+        } catch (error) {
+            console.error('Error loading PDF:', error);
+            alert(`Error loading ${file.name}. Please ensure it's a valid PDF.`);
+        }
+    }
 
     updateUI();
 }
@@ -93,6 +137,17 @@ function renderFilesList() {
         fileItem.draggable = true;
         fileItem.dataset.index = index;
 
+        const pageInputHtml = `
+            <div class="page-selection-wrapper ${enablePageSelection.checked ? 'active' : ''}">
+                <input type="text" 
+                       class="page-input" 
+                       placeholder="e.g., 1-3,5,7 or leave empty for all pages"
+                       value="${fileData.pageSelection}"
+                       data-file-index="${index}">
+                <div class="page-hint">Total pages: ${fileData.pageCount}</div>
+            </div>
+        `;
+
         fileItem.innerHTML = `
             <div class="drag-handle">
                 <div class="drag-line"></div>
@@ -107,7 +162,7 @@ function renderFilesList() {
             </div>
             <div class="file-info">
                 <div class="file-name">${fileData.name}</div>
-                <div class="file-size">${fileData.size}</div>
+                <div class="file-size">${fileData.size} • ${fileData.pageCount} pages</div>
             </div>
             <div class="file-actions">
                 <button class="icon-button delete" onclick="removeFile(${index})">
@@ -116,7 +171,15 @@ function renderFilesList() {
                     </svg>
                 </button>
             </div>
+            ${pageInputHtml}
         `;
+
+        // Add event listener for page input
+        const pageInput = fileItem.querySelector('.page-input');
+        pageInput.addEventListener('input', (e) => {
+            const fileIndex = parseInt(e.target.dataset.fileIndex);
+            selectedFiles[fileIndex].pageSelection = e.target.value;
+        });
 
         // Drag events for reordering
         fileItem.addEventListener('dragstart', handleDragStart);
@@ -126,6 +189,39 @@ function renderFilesList() {
 
         filesList.appendChild(fileItem);
     });
+}
+
+// Parse Page Selection
+function parsePageSelection(selection, totalPages) {
+    if (!selection || selection.trim() === '') {
+        // Return all pages if no selection
+        return Array.from({ length: totalPages }, (_, i) => i);
+    }
+
+    const pages = new Set();
+    const parts = selection.split(',').map(s => s.trim());
+
+    for (const part of parts) {
+        if (part.includes('-')) {
+            // Range like "2-5"
+            const [start, end] = part.split('-').map(n => parseInt(n.trim()));
+            if (isNaN(start) || isNaN(end) || start < 1 || end > totalPages || start > end) {
+                throw new Error(`Invalid range: ${part}`);
+            }
+            for (let i = start; i <= end; i++) {
+                pages.add(i - 1); // Convert to 0-indexed
+            }
+        } else {
+            // Single page like "7"
+            const page = parseInt(part);
+            if (isNaN(page) || page < 1 || page > totalPages) {
+                throw new Error(`Invalid page number: ${part}`);
+            }
+            pages.add(page - 1); // Convert to 0-indexed
+        }
+    }
+
+    return Array.from(pages).sort((a, b) => a - b);
 }
 
 // Remove File
@@ -196,9 +292,20 @@ function getDragAfterElement(container, y) {
 
 // Merge PDFs
 async function mergePDFs() {
-    if (selectedFiles.length < 2) {
-        alert('Please select at least 2 PDF files to merge');
+    if (selectedFiles.length < 1) {
+        alert('Please select at least 1 PDF file to merge');
         return;
+    }
+
+    // Validate filename
+    let filename = outputFilename.value.trim();
+    if (!filename) {
+        filename = getDefaultFilename();
+    }
+
+    // Add .pdf extension if not present
+    if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename += '.pdf';
     }
 
     // Show processing
@@ -213,7 +320,27 @@ async function mergePDFs() {
         for (const fileData of selectedFiles) {
             const arrayBuffer = await fileData.file.arrayBuffer();
             const pdf = await PDFDocument.load(arrayBuffer);
-            const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+            const totalPages = pdf.getPageCount();
+
+            let pageIndices;
+
+            try {
+                // Parse page selection
+                if (enablePageSelection.checked && fileData.pageSelection) {
+                    pageIndices = parsePageSelection(fileData.pageSelection, totalPages);
+                } else {
+                    // Use all pages
+                    pageIndices = Array.from({ length: totalPages }, (_, i) => i);
+                }
+            } catch (error) {
+                alert(`Error in page selection for ${fileData.name}: ${error.message}`);
+                processingSection.style.display = 'none';
+                filesSection.style.display = 'block';
+                return;
+            }
+
+            // Copy selected pages
+            const copiedPages = await mergedPdf.copyPages(pdf, pageIndices);
             copiedPages.forEach((page) => {
                 mergedPdf.addPage(page);
             });
@@ -223,7 +350,7 @@ async function mergePDFs() {
         const mergedPdfBytes = await mergedPdf.save();
 
         // Download the file
-        downloadFile(mergedPdfBytes, 'merged-document.pdf');
+        downloadFile(mergedPdfBytes, filename);
 
         // Reset UI
         setTimeout(() => {
@@ -231,7 +358,7 @@ async function mergePDFs() {
             filesSection.style.display = 'block';
 
             // Show success message
-            showSuccessMessage();
+            showSuccessMessage(filename);
         }, 500);
 
     } catch (error) {
@@ -256,7 +383,7 @@ function downloadFile(data, filename) {
 }
 
 // Show Success Message
-function showSuccessMessage() {
+function showSuccessMessage(filename) {
     const message = document.createElement('div');
     message.style.cssText = `
         position: fixed;
@@ -272,13 +399,14 @@ function showSuccessMessage() {
         font-weight: 600;
         z-index: 1000;
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        max-width: 90%;
     `;
     message.innerHTML = `
         <div style="display: flex; align-items: center; gap: 12px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="color: #2dff8f;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="color: #2dff8f; flex-shrink: 0;">
                 <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>PDF merged successfully!</span>
+            <span>PDF merged successfully as "${filename}"!</span>
         </div>
     `;
 
@@ -290,7 +418,7 @@ function showSuccessMessage() {
         setTimeout(() => {
             document.body.removeChild(message);
         }, 300);
-    }, 2000);
+    }, 3000);
 }
 
 // Format File Size
