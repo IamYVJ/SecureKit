@@ -1,7 +1,7 @@
 // ============================================
-// FILE SIZE VALIDATION MODULE - ENHANCED
+// FILE SIZE VALIDATION MODULE - SECURITY ENHANCED
 // SecureKit - Client-Side PDF Processing
-// Enhanced Error Handling & Reliability
+// Enhanced XSS Prevention & Security Hardening
 // ============================================
 
 // Configuration - Easily customizable
@@ -13,26 +13,209 @@ const FILE_SIZE_CONFIG = {
     MEMORY_MULTIPLIER: 3,                    // Estimate 3x file size for memory
     MESSAGE_DURATION_ERROR: 6000,            // 6 seconds for errors
     MESSAGE_DURATION_WARNING: 5000,          // 5 seconds for warnings
-    MESSAGE_DURATION_SUCCESS: 3000           // 3 seconds for success
+    MESSAGE_DURATION_SUCCESS: 5000           // 5 seconds for success
 };
 
 // Global error tracking
 let activeMessages = new Set();
 let errorCount = 0;
 
+// Security: Allowed file extensions (whitelist approach)
+const ALLOWED_FILE_EXTENSIONS = ['.pdf'];
+const ALLOWED_MIME_TYPES = ['application/pdf'];
+
+// Security: Maximum filename length
+const MAX_FILENAME_LENGTH = 255;
+
+// ============================================
+// SECURITY UTILITIES
+// ============================================
+
+/**
+ * Enhanced HTML escaping with comprehensive XSS prevention
+ * @param {string} text - Text to escape
+ * @returns {string} - Safely escaped text
+ */
+function escapeHtml(text) {
+    try {
+        if (text === null || text === undefined) {
+            return '';
+        }
+
+        if (typeof text !== 'string') {
+            text = String(text);
+        }
+
+        // Use DOMParser for safer escaping
+        const div = document.createElement('div');
+        div.textContent = text;
+        const escaped = div.innerHTML;
+
+        // Additional escaping for edge cases
+        return escaped
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/\//g, '&#x2F;');
+
+    } catch (error) {
+        console.error('Error in escapeHtml:', error);
+        // Fallback: Manual escaping
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/\//g, '&#x2F;');
+    }
+}
+
+/**
+ * Sanitize filename for security
+ * Prevents: Path traversal, XSS, command injection
+ * @param {string} filename - Original filename
+ * @returns {string} - Sanitized filename
+ */
+function sanitizeFilename(filename) {
+    try {
+        if (!filename || typeof filename !== 'string') {
+            return '';
+        }
+
+        // Remove .pdf extension if present (we'll add it back)
+        let name = filename.replace(/\.pdf$/i, '');
+
+        // Remove path separators (prevent path traversal)
+        name = name.replace(/[\\/]/g, '');
+
+        // Remove null bytes (prevent injection)
+        name = name.replace(/\0/g, '');
+
+        // Remove control characters
+        name = name.replace(/[\x00-\x1F\x7F]/g, '');
+
+        // Remove potentially dangerous characters
+        // Allow only: alphanumeric, spaces, hyphens, underscores, periods
+        name = name.replace(/[^a-zA-Z0-9\s._-]/g, '_');
+
+        // Replace multiple spaces/underscores with single
+        name = name.replace(/[_\s]+/g, '_');
+
+        // Remove leading/trailing dots (security: hidden files on Unix)
+        name = name.replace(/^\.+|\.+$/g, '');
+
+        // Remove leading/trailing spaces and underscores
+        name = name.replace(/^[_\s]+|[_\s]+$/g, '');
+
+        // Prevent reserved filenames (Windows)
+        const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 
+                               'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 
+                               'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+        if (reservedNames.includes(name.toUpperCase())) {
+            name = '_' + name;
+        }
+
+        // Limit length
+        if (name.length > MAX_FILENAME_LENGTH) {
+            name = name.substring(0, MAX_FILENAME_LENGTH);
+        }
+
+        // If empty after sanitization, return empty (caller should use default)
+        return name;
+
+    } catch (error) {
+        console.error('Error sanitizing filename:', error);
+        return '';
+    }
+}
+
+/**
+ * Validate file extension (whitelist approach)
+ * @param {string} filename - Filename to validate
+ * @returns {boolean} - True if allowed extension
+ */
+function hasValidExtension(filename) {
+    try {
+        if (!filename || typeof filename !== 'string') {
+            return false;
+        }
+
+        const lowerFilename = filename.toLowerCase();
+        return ALLOWED_FILE_EXTENSIONS.some(ext => lowerFilename.endsWith(ext));
+
+    } catch (error) {
+        console.error('Error validating extension:', error);
+        return false;
+    }
+}
+
+/**
+ * Validate MIME type (whitelist approach)
+ * @param {string} mimeType - MIME type to validate
+ * @returns {boolean} - True if allowed MIME type
+ */
+function hasValidMimeType(mimeType) {
+    try {
+        if (!mimeType || typeof mimeType !== 'string') {
+            return false;
+        }
+
+        return ALLOWED_MIME_TYPES.includes(mimeType.toLowerCase());
+
+    } catch (error) {
+        console.error('Error validating MIME type:', error);
+        return false;
+    }
+}
+
+/**
+ * Create safe DOM element with text content (prevents XSS)
+ * @param {string} tagName - Element tag name
+ * @param {string} textContent - Text content (will be escaped)
+ * @param {Object} attributes - Attributes to set
+ * @returns {HTMLElement} - Safely created element
+ */
+function createSafeElement(tagName, textContent = '', attributes = {}) {
+    try {
+        const element = document.createElement(tagName);
+
+        // Use textContent (safe) instead of innerHTML
+        if (textContent) {
+            element.textContent = textContent;
+        }
+
+        // Safely set attributes (whitelist approach)
+        const allowedAttributes = ['id', 'class', 'role', 'aria-live', 'aria-label', 'data-'];
+        for (const [key, value] of Object.entries(attributes)) {
+            if (allowedAttributes.some(allowed => key.startsWith(allowed))) {
+                element.setAttribute(key, String(value));
+            }
+        }
+
+        return element;
+
+    } catch (error) {
+        console.error('Error creating safe element:', error);
+        return document.createElement('div');
+    }
+}
+
 // ============================================
 // FILE SIZE VALIDATION
 // ============================================
 
 /**
- * Validate individual file size with enhanced error handling
+ * Validate individual file size with enhanced security
  * @param {File} file - File object to validate
  * @param {boolean} showWarning - Whether to return warnings for large files
  * @returns {Object} - { valid: boolean, error: string|null, warning: string|null }
  */
 function validateFileSize(file, showWarning = true) {
     try {
-        // Validate input
+        // Validate input (type checking for security)
         if (!file) {
             return {
                 valid: false,
@@ -45,6 +228,33 @@ function validateFileSize(file, showWarning = true) {
             return {
                 valid: false,
                 error: 'Invalid file object',
+                warning: null
+            };
+        }
+
+        // Security: Validate file extension (whitelist)
+        if (!hasValidExtension(file.name)) {
+            return {
+                valid: false,
+                error: `Invalid file type. Only PDF files are allowed.`,
+                warning: null
+            };
+        }
+
+        // Security: Validate MIME type (whitelist)
+        if (!hasValidMimeType(file.type)) {
+            return {
+                valid: false,
+                error: `Invalid MIME type "${escapeHtml(file.type)}". Expected application/pdf.`,
+                warning: null
+            };
+        }
+
+        // Security: Validate filename length
+        if (file.name.length > MAX_FILENAME_LENGTH) {
+            return {
+                valid: false,
+                error: `Filename is too long (${file.name.length} characters). Maximum: ${MAX_FILENAME_LENGTH}.`,
                 warning: null
             };
         }
@@ -62,7 +272,7 @@ function validateFileSize(file, showWarning = true) {
         if (file.size === 0) {
             return {
                 valid: false,
-                error: `File "${file.name}" is empty (0 bytes). Please select a valid PDF file.`,
+                error: `File is empty (0 bytes). Please select a valid PDF file.`,
                 warning: null
             };
         }
@@ -75,7 +285,7 @@ function validateFileSize(file, showWarning = true) {
             const maxSizeMB = (FILE_SIZE_CONFIG.MAX_SINGLE_FILE / (1024 * 1024)).toFixed(0);
             return {
                 valid: false,
-                error: `File "${file.name}" is too large (${fileSizeMB} MB).\nMaximum allowed: ${maxSizeMB} MB.\nPlease compress or split the file before uploading.`,
+                error: `File is too large (${fileSizeMB} MB).\nMaximum allowed: ${maxSizeMB} MB.\nPlease compress or split the file before uploading.`,
                 warning: null
             };
         }
@@ -191,12 +401,11 @@ function estimateMemoryUsage(fileSize) {
             return 0;
         }
 
-        // PDF processing typically requires 2-3x the file size in memory
         return fileSize * FILE_SIZE_CONFIG.MEMORY_MULTIPLIER;
 
     } catch (error) {
         console.error('Error in estimateMemoryUsage:', error);
-        return fileSize * 3; // Default fallback
+        return fileSize * 3;
     }
 }
 
@@ -214,7 +423,6 @@ function checkAvailableMemory(requiredMemory) {
             };
         }
 
-        // Check if Performance Memory API is available
         if (performance && performance.memory) {
             try {
                 const availableMemory = performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize;
@@ -228,7 +436,6 @@ function checkAvailableMemory(requiredMemory) {
                     };
                 }
 
-                // Warn if using more than 70% of available memory
                 if (requiredMemory > availableMemory * 0.7) {
                     return {
                         hasEnough: true,
@@ -240,9 +447,8 @@ function checkAvailableMemory(requiredMemory) {
             }
         }
 
-        // If we can't check memory, warn for very large files
         const requiredMB = (requiredMemory / (1024 * 1024)).toFixed(1);
-        if (requiredMemory > 150 * 1024 * 1024) { // 150 MB
+        if (requiredMemory > 150 * 1024 * 1024) {
             return {
                 hasEnough: true,
                 warning: `Processing large file (estimated ${requiredMB} MB memory usage). This may take a while.`
@@ -310,7 +516,6 @@ async function checkStorageQuota(requiredSpace) {
         console.error('Error in checkStorageQuota:', error);
     }
 
-    // If we can't check, assume it's okay
     return {
         hasSpace: true,
         available: null,
@@ -319,11 +524,11 @@ async function checkStorageQuota(requiredSpace) {
 }
 
 // ============================================
-// USER FEEDBACK FUNCTIONS - ENHANCED
+// USER FEEDBACK FUNCTIONS - SECURITY ENHANCED
 // ============================================
 
 /**
- * Show error message to user with enhanced error handling
+ * Show error message with XSS prevention
  * @param {string} message - Error message to display
  * @param {number} duration - Duration in milliseconds
  */
@@ -334,11 +539,9 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
             return;
         }
 
-        // Track error count for debugging
         errorCount++;
         console.error(`[Error #${errorCount}]:`, message);
 
-        // Remove any existing error messages
         const existing = document.getElementById('validation-error-message');
         if (existing) {
             try {
@@ -349,11 +552,14 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
             }
         }
 
-        const errorDiv = document.createElement('div');
-        errorDiv.id = 'validation-error-message';
-        errorDiv.className = 'validation-message validation-error';
-        errorDiv.setAttribute('role', 'alert');
-        errorDiv.setAttribute('aria-live', 'assertive');
+        // Create element using safe method
+        const errorDiv = createSafeElement('div', '', {
+            id: 'validation-error-message',
+            class: 'validation-message validation-error',
+            role: 'alert',
+            'aria-live': 'assertive'
+        });
+
         errorDiv.style.cssText = `
             position: fixed;
             top: 20px;
@@ -375,18 +581,40 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
             gap: 12px;
         `;
 
-        errorDiv.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="color: #ff4444; flex-shrink: 0; margin-top: 2px;">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                <path d="M15 9l-6 6m0-6l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span style="white-space: pre-line; flex: 1;">${escapeHtml(message)}</span>
-        `;
+        // Create icon SVG safely
+        const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        iconSvg.setAttribute('width', '20');
+        iconSvg.setAttribute('height', '20');
+        iconSvg.setAttribute('viewBox', '0 0 24 24');
+        iconSvg.setAttribute('fill', 'none');
+        iconSvg.style.cssText = 'color: #ff4444; flex-shrink: 0; margin-top: 2px;';
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '10');
+        circle.setAttribute('stroke', 'currentColor');
+        circle.setAttribute('stroke-width', '2');
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M15 9l-6 6m0-6l6 6');
+        path.setAttribute('stroke', 'currentColor');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-linecap', 'round');
+
+        iconSvg.appendChild(circle);
+        iconSvg.appendChild(path);
+
+        // Create message span safely (textContent prevents XSS)
+        const messageSpan = createSafeElement('span', message);
+        messageSpan.style.cssText = 'white-space: pre-line; flex: 1;';
+
+        errorDiv.appendChild(iconSvg);
+        errorDiv.appendChild(messageSpan);
 
         document.body.appendChild(errorDiv);
         activeMessages.add('error');
 
-        // Auto-remove after duration
         setTimeout(() => {
             try {
                 if (errorDiv && errorDiv.parentNode) {
@@ -405,7 +633,6 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
 
     } catch (error) {
         console.error('Failed to show error message:', error);
-        // Fallback to alert if DOM manipulation fails
         try {
             alert('Error: ' + message);
         } catch (alertError) {
@@ -415,7 +642,7 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
 }
 
 /**
- * Show warning message to user with enhanced error handling
+ * Show warning message with XSS prevention
  * @param {string} message - Warning message to display
  * @param {number} duration - Duration in milliseconds
  */
@@ -428,7 +655,6 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
 
         console.warn('[Warning]:', message);
 
-        // Remove any existing warning messages
         const existing = document.getElementById('validation-warning-message');
         if (existing) {
             try {
@@ -439,11 +665,13 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
             }
         }
 
-        const warningDiv = document.createElement('div');
-        warningDiv.id = 'validation-warning-message';
-        warningDiv.className = 'validation-message validation-warning';
-        warningDiv.setAttribute('role', 'alert');
-        warningDiv.setAttribute('aria-live', 'polite');
+        const warningDiv = createSafeElement('div', '', {
+            id: 'validation-warning-message',
+            class: 'validation-message validation-warning',
+            role: 'alert',
+            'aria-live': 'polite'
+        });
+
         warningDiv.style.cssText = `
             position: fixed;
             top: 20px;
@@ -464,18 +692,37 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
             gap: 12px;
         `;
 
-        warningDiv.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="color: #000000; flex-shrink: 0; margin-top: 2px;">
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 9v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span style="flex: 1;">${escapeHtml(message)}</span>
-        `;
+        // Create icon SVG safely
+        const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        iconSvg.setAttribute('width', '20');
+        iconSvg.setAttribute('height', '20');
+        iconSvg.setAttribute('viewBox', '0 0 24 24');
+        iconSvg.setAttribute('fill', 'none');
+        iconSvg.style.cssText = 'color: #000000; flex-shrink: 0; margin-top: 2px;';
+
+        const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path1.setAttribute('d', 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z');
+        path1.setAttribute('stroke', 'currentColor');
+        path1.setAttribute('stroke-width', '2');
+
+        const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path2.setAttribute('d', 'M12 9v4m0 4h.01');
+        path2.setAttribute('stroke', 'currentColor');
+        path2.setAttribute('stroke-width', '2');
+        path2.setAttribute('stroke-linecap', 'round');
+
+        iconSvg.appendChild(path1);
+        iconSvg.appendChild(path2);
+
+        const messageSpan = createSafeElement('span', message);
+        messageSpan.style.cssText = 'flex: 1;';
+
+        warningDiv.appendChild(iconSvg);
+        warningDiv.appendChild(messageSpan);
 
         document.body.appendChild(warningDiv);
         activeMessages.add('warning');
 
-        // Auto-remove after duration
         setTimeout(() => {
             try {
                 if (warningDiv && warningDiv.parentNode) {
@@ -498,7 +745,7 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
 }
 
 /**
- * Show success message to user
+ * Show success message with XSS prevention
  * @param {string} message - Success message to display
  * @param {number} duration - Duration in milliseconds
  */
@@ -511,10 +758,12 @@ function showSuccessMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
 
         console.log('[Success]:', message);
 
-        const successDiv = document.createElement('div');
-        successDiv.className = 'validation-message validation-success';
-        successDiv.setAttribute('role', 'status');
-        successDiv.setAttribute('aria-live', 'polite');
+        const successDiv = createSafeElement('div', '', {
+            class: 'validation-message validation-success',
+            role: 'status',
+            'aria-live': 'polite'
+        });
+
         successDiv.style.cssText = `
             position: fixed;
             top: 20px;
@@ -535,13 +784,35 @@ function showSuccessMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
             gap: 12px;
         `;
 
-        successDiv.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="color: #000000; flex-shrink: 0;">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>${escapeHtml(message)}</span>
-        `;
+        // Create icon SVG safely
+        const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        iconSvg.setAttribute('width', '20');
+        iconSvg.setAttribute('height', '20');
+        iconSvg.setAttribute('viewBox', '0 0 24 24');
+        iconSvg.setAttribute('fill', 'none');
+        iconSvg.style.cssText = 'color: #000000; flex-shrink: 0;';
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '10');
+        circle.setAttribute('stroke', 'currentColor');
+        circle.setAttribute('stroke-width', '2');
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M9 12l2 2 4-4');
+        path.setAttribute('stroke', 'currentColor');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+
+        iconSvg.appendChild(circle);
+        iconSvg.appendChild(path);
+
+        const messageSpan = createSafeElement('span', message);
+
+        successDiv.appendChild(iconSvg);
+        successDiv.appendChild(messageSpan);
 
         document.body.appendChild(successDiv);
 
@@ -618,33 +889,6 @@ function checkBrowserCompatibility() {
 // ============================================
 
 /**
- * Escape HTML to prevent XSS
- * @param {string} text - Text to escape
- * @returns {string} - Escaped text
- */
-function escapeHtml(text) {
-    try {
-        if (typeof text !== 'string') {
-            text = String(text);
-        }
-
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-
-    } catch (error) {
-        console.error('Error in escapeHtml:', error);
-        // Fallback: basic escaping
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-}
-
-/**
  * Format bytes to human-readable size
  * @param {number} bytes - Size in bytes
  * @returns {string} - Formatted size string
@@ -694,14 +938,15 @@ function clearAllMessages() {
 // INITIALIZATION
 // ============================================
 
-// Log module load
 try {
-    console.log('✅ File Size Validation Module Loaded (Enhanced)');
+    console.log('✅ File Size Validation Module Loaded (Security Enhanced)');
     console.log('   Max Single File:', formatFileSize(FILE_SIZE_CONFIG.MAX_SINGLE_FILE));
     console.log('   Max Total (Merge):', formatFileSize(FILE_SIZE_CONFIG.MAX_TOTAL_MERGE));
     console.log('   Warning Size:', formatFileSize(FILE_SIZE_CONFIG.WARNING_SIZE));
+    console.log('   🔒 XSS Protection: Enhanced');
+    console.log('   🔒 File Type Whitelist: PDF only');
+    console.log('   🔒 Filename Sanitization: Enabled');
 
-    // Check browser compatibility on load
     const compat = checkBrowserCompatibility();
     if (!compat.supported) {
         console.error('❌ Browser compatibility issues detected:', compat.missingFeatures);
