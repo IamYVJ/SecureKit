@@ -1,6 +1,11 @@
-// Merge PDF Functionality
+// ============================================
+// MERGE PDF - WITH FILE SIZE VALIDATION
+// SecureKit - Client-Side PDF Processing
+// ============================================
+
 const { PDFDocument } = PDFLib;
 
+// State
 let selectedFiles = [];
 let draggedElement = null;
 
@@ -21,6 +26,10 @@ const outputFilename = document.getElementById('outputFilename');
 const accordionToggle = document.getElementById('accordionToggle');
 const accordionContent = document.getElementById('accordionContent');
 
+// ============================================
+// INITIALIZATION
+// ============================================
+
 // Set default filename
 function getDefaultFilename() {
     const now = new Date();
@@ -38,7 +47,10 @@ accordionToggle.addEventListener('click', () => {
     accordionContent.classList.toggle('active');
 });
 
-// Event Listeners
+// ============================================
+// EVENT LISTENERS
+// ============================================
+
 browseButton.addEventListener('click', () => fileInput.click());
 uploadArea.addEventListener('click', (e) => {
     if (e.target !== browseButton) {
@@ -77,19 +89,71 @@ uploadArea.addEventListener('drop', (e) => {
     uploadArea.classList.remove('drag-over');
     const files = Array.from(e.dataTransfer.files).filter(file => file.type === 'application/pdf');
     if (files.length > 0) {
-        addFiles(files);
+        handleFileSelect({ target: { files: files } });
     }
 });
+
+// ============================================
+// FILE HANDLING WITH VALIDATION
+// ============================================
 
 // Handle File Selection
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
-    addFiles(files);
+
+    // Validate each file before adding
+    const validFiles = [];
+    const errors = [];
+
+    for (const file of files) {
+        const validation = validateFileSize(file, true);
+
+        if (!validation.valid) {
+            errors.push(validation.error);
+        } else {
+            validFiles.push(file);
+            if (validation.warning) {
+                showWarningMessage(validation.warning);
+            }
+        }
+    }
+
+    // Show errors if any
+    if (errors.length > 0) {
+        showErrorMessage(errors.join('\n'));
+    }
+
+    // Add valid files
+    if (validFiles.length > 0) {
+        addFiles(validFiles);
+    }
+
     fileInput.value = ''; // Reset input
 }
 
-// Add Files
+// Add Files with Size Validation
 async function addFiles(files) {
+    // First, validate total size including existing files
+    const potentialTotalFiles = [...selectedFiles, ...files.map(f => ({ file: f, size: f.size, sizeBytes: f.size }))];
+    const totalValidation = validateTotalSize(potentialTotalFiles);
+
+    if (!totalValidation.valid) {
+        showErrorMessage(totalValidation.error);
+        return;
+    }
+
+    // Check memory requirements
+    const estimatedMemory = estimateMemoryUsage(totalValidation.totalSize);
+    const memoryCheck = checkAvailableMemory(estimatedMemory);
+
+    if (!memoryCheck.hasEnough) {
+        showErrorMessage(memoryCheck.warning || 'Insufficient memory to process these files.');
+        return;
+    } else if (memoryCheck.warning) {
+        showWarningMessage(memoryCheck.warning);
+    }
+
+    // Process each file
     for (const file of files) {
         try {
             // Load PDF to get page count
@@ -97,22 +161,36 @@ async function addFiles(files) {
             const pdf = await PDFDocument.load(arrayBuffer);
             const pageCount = pdf.getPageCount();
 
-            selectedFiles.push({
+            const fileData = {
                 id: Date.now() + Math.random(),
                 file: file,
                 name: file.name,
                 size: formatFileSize(file.size),
+                sizeBytes: file.size,
                 pageCount: pageCount,
                 pageSelection: ''
-            });
+            };
+
+            selectedFiles.push(fileData);
+
+            // Add UI warning if file is large
+            const validation = validateFileSize(file, false);
+            if (validation.warning) {
+                fileData.sizeWarning = validation.warning;
+            }
+
         } catch (error) {
             console.error('Error loading PDF:', error);
-            alert(`Error loading ${file.name}. Please ensure it's a valid PDF.`);
+            showErrorMessage(`Error loading ${file.name}. Please ensure it's a valid PDF.`);
         }
     }
 
     updateUI();
 }
+
+// ============================================
+// UI UPDATE FUNCTIONS
+// ============================================
 
 // Update UI
 function updateUI() {
@@ -121,6 +199,7 @@ function updateUI() {
         filesSection.style.display = 'block';
         renderFilesList();
         fileCount.textContent = selectedFiles.length;
+        updateSizeDisplay();
     } else {
         uploadSection.style.display = 'block';
         filesSection.style.display = 'none';
@@ -141,7 +220,7 @@ function renderFilesList() {
             <div class="page-selection-wrapper ${enablePageSelection.checked ? 'active' : ''}">
                 <input type="text" 
                        class="page-input" 
-                       placeholder="e.g., 1-3,5,7 or leave empty for all pages"
+                       placeholder="e.g., 1-3,5,7 or leave empty for all pages" 
                        value="${fileData.pageSelection}"
                        data-file-index="${index}">
                 <div class="page-hint">Total pages: ${fileData.pageCount}</div>
@@ -161,7 +240,7 @@ function renderFilesList() {
                 </svg>
             </div>
             <div class="file-info">
-                <div class="file-name">${fileData.name}</div>
+                <div class="file-name">${escapeHtml(fileData.name)}</div>
                 <div class="file-size">${fileData.size} • ${fileData.pageCount} pages</div>
             </div>
             <div class="file-actions">
@@ -173,6 +252,24 @@ function renderFilesList() {
             </div>
             ${pageInputHtml}
         `;
+
+        // Add size warning if exists
+        if (fileData.sizeWarning) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'file-size-warning';
+            warningDiv.style.cssText = `
+                width: 100%;
+                padding: 8px 12px;
+                background-color: rgba(255, 152, 0, 0.1);
+                border: 1px solid #ff9800;
+                border-radius: 8px;
+                color: #ff9800;
+                font-size: 12px;
+                margin-top: 8px;
+            `;
+            warningDiv.textContent = `⚠️ ${fileData.sizeWarning}`;
+            fileItem.appendChild(warningDiv);
+        }
 
         // Add event listener for page input
         const pageInput = fileItem.querySelector('.page-input');
@@ -191,52 +288,37 @@ function renderFilesList() {
     });
 }
 
-// Parse Page Selection
-function parsePageSelection(selection, totalPages) {
-    if (!selection || selection.trim() === '') {
-        // Return all pages if no selection
-        return Array.from({ length: totalPages }, (_, i) => i);
+// Update Size Display
+function updateSizeDisplay() {
+    const totalValidation = validateTotalSize(selectedFiles);
+    const percentage = (totalValidation.totalSize / FILE_SIZE_CONFIG.MAX_TOTAL_MERGE * 100).toFixed(1);
+
+    // Add or update size indicator
+    let sizeIndicator = document.getElementById('totalSizeIndicator');
+    if (!sizeIndicator) {
+        sizeIndicator = document.createElement('div');
+        sizeIndicator.id = 'totalSizeIndicator';
+        sizeIndicator.style.cssText = `
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        `;
+        fileCount.parentElement.appendChild(sizeIndicator);
     }
 
-    const pages = new Set();
-    const parts = selection.split(',').map(s => s.trim());
-
-    for (const part of parts) {
-        if (part.includes('-')) {
-            // Range like "2-5"
-            const [start, end] = part.split('-').map(n => parseInt(n.trim()));
-            if (isNaN(start) || isNaN(end) || start < 1 || end > totalPages || start > end) {
-                throw new Error(`Invalid range: ${part}`);
-            }
-            for (let i = start; i <= end; i++) {
-                pages.add(i - 1); // Convert to 0-indexed
-            }
-        } else {
-            // Single page like "7"
-            const page = parseInt(part);
-            if (isNaN(page) || page < 1 || page > totalPages) {
-                throw new Error(`Invalid page number: ${part}`);
-            }
-            pages.add(page - 1); // Convert to 0-indexed
-        }
-    }
-
-    return Array.from(pages).sort((a, b) => a - b);
+    const sizeColor = percentage > 80 ? '#ff9800' : 'var(--text-secondary)';
+    sizeIndicator.innerHTML = `
+        <span style="color: ${sizeColor};">
+            Total: ${formatFileSize(totalValidation.totalSize)} / ${formatFileSize(FILE_SIZE_CONFIG.MAX_TOTAL_MERGE)}
+            (${percentage}%)
+        </span>
+    `;
 }
 
-// Remove File
-function removeFile(index) {
-    selectedFiles.splice(index, 1);
-    updateUI();
-}
+// ============================================
+// DRAG AND DROP FOR REORDERING
+// ============================================
 
-// Clear All Files
-function clearAllFiles() {
-    selectedFiles = [];
-    updateUI();
-}
-
-// Drag and Drop for Reordering
 function handleDragStart(e) {
     draggedElement = e.target;
     e.target.classList.add('dragging');
@@ -271,6 +353,7 @@ function handleDragEnd(e) {
         const index = parseInt(item.dataset.index);
         newOrder.push(selectedFiles[index]);
     });
+
     selectedFiles = newOrder;
     renderFilesList();
 }
@@ -290,10 +373,84 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-// Merge PDFs
+// ============================================
+// PAGE SELECTION PARSING
+// ============================================
+
+function parsePageSelection(selection, totalPages) {
+    if (!selection || !selection.trim()) {
+        // Return all pages if no selection
+        return Array.from({ length: totalPages }, (_, i) => i);
+    }
+
+    const pages = new Set();
+    const parts = selection.split(',').map(s => s.trim());
+
+    for (const part of parts) {
+        if (part.includes('-')) {
+            // Range like "2-5"
+            const [start, end] = part.split('-').map(n => parseInt(n.trim()));
+
+            if (isNaN(start) || isNaN(end) || start < 1 || end > totalPages || start > end) {
+                throw new Error(`Invalid range: ${part}`);
+            }
+
+            for (let i = start; i <= end; i++) {
+                pages.add(i - 1); // Convert to 0-indexed
+            }
+        } else {
+            // Single page like "7"
+            const page = parseInt(part);
+
+            if (isNaN(page) || page < 1 || page > totalPages) {
+                throw new Error(`Invalid page number: ${part}`);
+            }
+
+            pages.add(page - 1); // Convert to 0-indexed
+        }
+    }
+
+    return Array.from(pages).sort((a, b) => a - b);
+}
+
+// ============================================
+// FILE OPERATIONS
+// ============================================
+
+// Remove File
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    updateUI();
+}
+
+// Clear All Files
+function clearAllFiles() {
+    selectedFiles = [];
+    updateUI();
+}
+
+// ============================================
+// MERGE PDFs WITH VALIDATION
+// ============================================
+
 async function mergePDFs() {
     if (selectedFiles.length < 1) {
-        alert('Please select at least 1 PDF file to merge');
+        showErrorMessage('Please select at least 1 PDF file to merge');
+        return;
+    }
+
+    // Final size validation before processing
+    const totalValidation = validateTotalSize(selectedFiles);
+    if (!totalValidation.valid) {
+        showErrorMessage(totalValidation.error);
+        return;
+    }
+
+    // Check storage quota for output
+    const estimatedOutputSize = totalValidation.totalSize * 1.1; // Output is ~110% of input
+    const storageCheck = await checkStorageQuota(estimatedOutputSize);
+    if (!storageCheck.hasSpace) {
+        showErrorMessage('Insufficient storage space for output file. Please free up some space.');
         return;
     }
 
@@ -302,6 +459,9 @@ async function mergePDFs() {
     if (!filename) {
         filename = getDefaultFilename();
     }
+
+    // Sanitize filename to prevent injection
+    filename = sanitizeFilename(filename);
 
     // Add .pdf extension if not present
     if (!filename.toLowerCase().endsWith('.pdf')) {
@@ -333,7 +493,7 @@ async function mergePDFs() {
                     pageIndices = Array.from({ length: totalPages }, (_, i) => i);
                 }
             } catch (error) {
-                alert(`Error in page selection for ${fileData.name}: ${error.message}`);
+                showErrorMessage(`Error in page selection for ${fileData.name}: ${error.message}`);
                 processingSection.style.display = 'none';
                 filesSection.style.display = 'block';
                 return;
@@ -341,9 +501,7 @@ async function mergePDFs() {
 
             // Copy selected pages
             const copiedPages = await mergedPdf.copyPages(pdf, pageIndices);
-            copiedPages.forEach((page) => {
-                mergedPdf.addPage(page);
-            });
+            copiedPages.forEach(page => mergedPdf.addPage(page));
         }
 
         // Save the merged PDF
@@ -363,11 +521,15 @@ async function mergePDFs() {
 
     } catch (error) {
         console.error('Error merging PDFs:', error);
-        alert('An error occurred while merging PDFs. Please try again.');
+        showErrorMessage('An error occurred while merging PDFs. Please try again.');
         processingSection.style.display = 'none';
         filesSection.style.display = 'block';
     }
 }
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
 
 // Download File
 function downloadFile(data, filename) {
@@ -401,12 +563,13 @@ function showSuccessMessage(filename) {
         box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
         max-width: 90%;
     `;
+
     message.innerHTML = `
         <div style="display: flex; align-items: center; gap: 12px;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="color: #2dff8f; flex-shrink: 0;">
                 <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <span>PDF merged successfully as "${filename}"!</span>
+            <span>PDF merged successfully as ${escapeHtml(filename)}!</span>
         </div>
     `;
 
@@ -415,9 +578,7 @@ function showSuccessMessage(filename) {
     setTimeout(() => {
         message.style.transition = 'opacity 0.3s ease';
         message.style.opacity = '0';
-        setTimeout(() => {
-            document.body.removeChild(message);
-        }, 300);
+        setTimeout(() => document.body.removeChild(message), 300);
     }, 3000);
 }
 
@@ -429,3 +590,42 @@ function formatFileSize(bytes) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
+
+// Sanitize Filename
+function sanitizeFilename(filename) {
+    // Remove .pdf extension temporarily
+    let name = filename.replace(/\.pdf$/i, '');
+
+    // Replace invalid characters with underscore
+    name = name.replace(/[^a-z0-9_\-\s]/gi, '_');
+
+    // Limit length to 200 characters
+    name = name.substring(0, 200);
+
+    // Remove leading/trailing spaces and underscores
+    name = name.replace(/^[_\s]+|[_\s]+$/g, '');
+
+    // If empty after sanitization, use default
+    if (!name) {
+        name = getDefaultFilename();
+    }
+
+    return name;
+}
+
+// Escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Initialize browser compatibility check on page load
+window.addEventListener('DOMContentLoaded', () => {
+    const compatibility = checkBrowserCompatibility();
+    if (!compatibility.supported) {
+        showErrorMessage(`Your browser is missing required features: ${compatibility.missingFeatures.join(', ')}. Please use a modern browser.`);
+        document.querySelector('.tool-page').style.pointerEvents = 'none';
+        document.querySelector('.tool-page').style.opacity = '0.5';
+    }
+});
