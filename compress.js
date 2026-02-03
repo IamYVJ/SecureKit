@@ -1,7 +1,14 @@
-// Compress PDF Functionality
+// ============================================
+// COMPRESS PDF - ENHANCED & DEDUPLICATED
+// SecureKit - Client-Side PDF Processing
+// Uses shared-utils.js for common functions
+// ============================================
+
 const { PDFDocument } = PDFLib;
 
+// State
 let selectedFiles = [];
+let isProcessing = false;
 
 // DOM Elements
 const uploadArea = document.getElementById('uploadArea');
@@ -18,355 +25,405 @@ const processingSection = document.getElementById('processingSection');
 const targetSize = document.getElementById('targetSize');
 const sizeUnit = document.getElementById('sizeUnit');
 
-// Event Listeners
-browseButton.addEventListener('click', () => fileInput.click());
-uploadArea.addEventListener('click', (e) => {
-    if (e.target !== browseButton) {
-        fileInput.click();
-    }
-});
+// ============================================
+// EVENT LISTENERS
+// ============================================
 
-fileInput.addEventListener('change', handleFileSelect);
-addMoreButton.addEventListener('click', () => fileInput.click());
-clearButton.addEventListener('click', clearAllFiles);
-compressButton.addEventListener('click', compressPDFs);
+try {
+    browseButton?.addEventListener('click', () => fileInput.click());
 
-// Radio button change handlers
-const radioButtons = document.querySelectorAll('input[name="compressionLevel"]');
-radioButtons.forEach(radio => {
-    radio.addEventListener('change', handleRadioChange);
-});
-
-function handleRadioChange(e) {
-    // Hide all input wrappers
-    document.querySelectorAll('.option-input-wrapper').forEach(wrapper => {
-        wrapper.style.display = 'none';
+    uploadArea?.addEventListener('click', (e) => {
+        if (e.target !== browseButton) {
+            fileInput.click();
+        }
     });
 
-    // Show the selected one
-    const selectedRadio = e.target;
-    const wrapper = selectedRadio.parentElement.querySelector('.option-input-wrapper');
-    if (wrapper) {
-        wrapper.style.display = 'block';
-    }
+    fileInput?.addEventListener('change', handleFileSelect);
+    addMoreButton?.addEventListener('click', () => fileInput.click());
+    clearButton?.addEventListener('click', clearAllFiles);
+    compressButton?.addEventListener('click', compressPDFs);
+
+    // Setup radio buttons using shared utility
+    setupRadioButtons('compressionLevel', (e) => {
+        handleRadioToggle(e, '.option-input-wrapper');
+    });
+} catch (error) {
+    console.error('Error setting up event listeners:', error);
+    showErrorMessage('Failed to initialize the application. Please refresh the page.');
 }
 
-// Drag and Drop
-uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.classList.add('drag-over');
-});
-
-uploadArea.addEventListener('dragleave', () => {
-    uploadArea.classList.remove('drag-over');
-});
-
-uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadArea.classList.remove('drag-over');
-    const files = Array.from(e.dataTransfer.files).filter(file => file.type === 'application/pdf');
-    if (files.length > 0) {
-        addFiles(files);
-    }
-});
-
-// Handle File Selection
-function handleFileSelect(e) {
-    const files = Array.from(e.target.files);
+// Setup drag and drop using shared utility
+setupDragAndDrop(uploadArea, (files) => {
     addFiles(files);
-    fileInput.value = '';
-}
+}, { allowMultiple: true });
 
-// Add Files
-function addFiles(files) {
-    files.forEach(file => {
-        selectedFiles.push({
-            id: Date.now() + Math.random(),
-            file: file,
-            name: file.name,
-            size: file.size,
-            sizeFormatted: formatFileSize(file.size)
-        });
-    });
+// ============================================
+// FILE HANDLING
+// ============================================
 
-    updateUI();
-}
+function handleFileSelect(e) {
+    try {
+        if (isProcessing) {
+            showWarningMessage('Please wait for the current operation to complete.');
+            return;
+        }
 
-// Update UI
-function updateUI() {
-    if (selectedFiles.length > 0) {
-        uploadSection.style.display = 'none';
-        filesSection.style.display = 'block';
-        renderFilesList();
-        fileCount.textContent = selectedFiles.length;
-    } else {
-        uploadSection.style.display = 'block';
-        filesSection.style.display = 'none';
+        const files = Array.from(e.target.files);
+        addFiles(files);
+        fileInput.value = '';
+    } catch (error) {
+        console.error('Error in handleFileSelect:', error);
+        showErrorMessage('An error occurred while selecting files. Please try again.');
+        fileInput.value = '';
     }
 }
 
-// Render Files List
+function addFiles(files) {
+    try {
+        if (!Array.isArray(files) || files.length === 0) {
+            return;
+        }
+
+        const validFiles = [];
+        const errors = [];
+
+        files.forEach(file => {
+            try {
+                // Validate it's a PDF using shared utility
+                if (!isPDF(file)) {
+                    errors.push(`"${file.name}" is not a PDF file`);
+                    return;
+                }
+
+                const validation = validateFileSize(file, true);
+
+                if (!validation.valid) {
+                    errors.push(validation.error);
+                } else {
+                    validFiles.push({
+                        id: Date.now() + Math.random(),
+                        file: file,
+                        name: file.name,
+                        size: file.size,
+                        sizeFormatted: formatFileSize(file.size)
+                    });
+
+                    if (validation.warning) {
+                        showWarningMessage(validation.warning);
+                    }
+                }
+            } catch (error) {
+                console.error('Error validating file:', file.name, error);
+                errors.push(`Error validating "${file.name}"`);
+            }
+        });
+
+        if (errors.length > 0) {
+            showErrorMessage(errors.join('\n'));
+        }
+
+        if (validFiles.length > 0) {
+            selectedFiles.push(...validFiles);
+            updateUI();
+        }
+    } catch (error) {
+        console.error('Error in addFiles:', error);
+        showErrorMessage('An error occurred while adding files. Please try again.');
+    }
+}
+
+// ============================================
+// UI FUNCTIONS
+// ============================================
+
+function updateUI() {
+    try {
+        if (selectedFiles.length > 0) {
+            uploadSection.style.display = 'none';
+            filesSection.style.display = 'block';
+            renderFilesList();
+            fileCount.textContent = selectedFiles.length;
+        } else {
+            uploadSection.style.display = 'block';
+            filesSection.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error updating UI:', error);
+        showErrorMessage('UI update failed. Please refresh the page.');
+    }
+}
+
 function renderFilesList() {
-    filesList.innerHTML = '';
+    try {
+        if (!filesList) {
+            console.error('Files list element not found');
+            return;
+        }
 
-    selectedFiles.forEach((fileData, index) => {
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
+        filesList.innerHTML = '';
 
-        fileItem.innerHTML = `
-            <div class="file-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/>
-                    <path d="M14 2v6h6" stroke="currentColor" stroke-width="2"/>
-                </svg>
-            </div>
-            <div class="file-info">
-                <div class="file-name">${fileData.name}</div>
-                <div class="file-size">${fileData.sizeFormatted}</div>
-            </div>
-            <div class="file-actions">
-                <button class="icon-button delete" onclick="removeFile(${index})">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </button>
-            </div>
-        `;
+        selectedFiles.forEach((fileData, index) => {
+            try {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
 
-        filesList.appendChild(fileItem);
-    });
+                fileItem.innerHTML = `
+                    <div class="file-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">${escapeHtml(fileData.name)}</div>
+                        <div class="file-size">${fileData.sizeFormatted}</div>
+                    </div>
+                    <button class="remove-file" data-index="${index}">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                `;
+
+                const removeBtn = fileItem.querySelector('.remove-file');
+                removeBtn?.addEventListener('click', () => removeFile(index));
+
+                filesList.appendChild(fileItem);
+            } catch (error) {
+                console.error('Error rendering file item:', fileData.name, error);
+            }
+        });
+    } catch (error) {
+        console.error('Error in renderFilesList:', error);
+    }
 }
 
-// Remove File
 function removeFile(index) {
-    selectedFiles.splice(index, 1);
-    updateUI();
+    try {
+        selectedFiles.splice(index, 1);
+        updateUI();
+    } catch (error) {
+        console.error('Error removing file:', error);
+        showErrorMessage('Failed to remove file. Please try again.');
+    }
 }
 
-// Clear All Files
 function clearAllFiles() {
-    selectedFiles = [];
-    updateUI();
+    try {
+        selectedFiles = [];
+        updateUI();
+    } catch (error) {
+        console.error('Error clearing files:', error);
+        showErrorMessage('Failed to clear files. Please try again.');
+    }
 }
 
-// Compress PDFs
+// ============================================
+// COMPRESS PDF FUNCTION
+// ============================================
+
 async function compressPDFs() {
-    if (selectedFiles.length === 0) {
-        alert('Please select at least one PDF file');
+    if (isProcessing) {
+        showWarningMessage('Compression operation already in progress. Please wait.');
         return;
     }
 
-    const selectedLevel = document.querySelector('input[name="compressionLevel"]:checked').value;
-    let compressionOptions = {};
-
-    // Set compression parameters based on level
-    switch(selectedLevel) {
-        case 'low':
-            compressionOptions = { level: 0.9 }; // Minimal compression
-            break;
-        case 'medium':
-            compressionOptions = { level: 0.7 }; // Balanced (recommended)
-            break;
-        case 'high':
-            compressionOptions = { level: 0.4 }; // Maximum compression
-            break;
-        case 'custom':
-            const targetSizeValue = parseFloat(targetSize.value);
-            const unit = sizeUnit.value;
-            if (isNaN(targetSizeValue) || targetSizeValue <= 0) {
-                alert('Please enter a valid target file size');
-                return;
-            }
-            // Convert to bytes
-            const targetBytes = unit === 'MB' ? targetSizeValue * 1024 * 1024 : targetSizeValue * 1024;
-            compressionOptions = { targetSize: targetBytes };
-            break;
-    }
-
-    // Show processing
-    filesSection.style.display = 'none';
-    processingSection.style.display = 'block';
-    document.getElementById('totalFiles').textContent = selectedFiles.length;
-    document.getElementById('progressInfo').style.display = 'block';
-
-    let successCount = 0;
-    let totalSavings = 0;
-
     try {
+        if (selectedFiles.length === 0) {
+            showErrorMessage('Please select at least one PDF file to compress.');
+            return;
+        }
+
+        const compressionLevel = document.querySelector('input[name="compressionLevel"]:checked')?.value;
+
+        if (!compressionLevel) {
+            showErrorMessage('Please select a compression level.');
+            return;
+        }
+
+        isProcessing = true;
+        setProcessingState(true, compressButton, processingSection, 'Compress PDFs', 'Compressing...');
+
+        let compressionOptions = {};
+
+        // Determine compression settings
+        if (compressionLevel === 'low') {
+            compressionOptions = {
+                objectsPerTick: 50,
+                useObjectStreams: true
+            };
+        } else if (compressionLevel === 'medium') {
+            compressionOptions = {
+                objectsPerTick: 25,
+                useObjectStreams: true
+            };
+        } else if (compressionLevel === 'high') {
+            compressionOptions = {
+                objectsPerTick: 10,
+                useObjectStreams: true
+            };
+        } else if (compressionLevel === 'custom') {
+            const targetSizeValue = parseInt(targetSize?.value);
+            const unit = sizeUnit?.value || 'MB';
+
+            if (isNaN(targetSizeValue) || targetSizeValue < 1) {
+                throw new Error('Please enter a valid target size (minimum 1).');
+            }
+
+            // Convert to bytes
+            const targetSizeBytes = unit === 'MB' 
+                ? targetSizeValue * 1024 * 1024 
+                : targetSizeValue * 1024;
+
+            compressionOptions = {
+                targetSize: targetSizeBytes,
+                objectsPerTick: 10,
+                useObjectStreams: true
+            };
+        }
+
+        const successfulCompressions = [];
+        const failedCompressions = [];
+
         for (let i = 0; i < selectedFiles.length; i++) {
-            document.getElementById('currentFile').textContent = i + 1;
-            const fileData = selectedFiles[i];
-
             try {
-                const result = await compressPDF(fileData, compressionOptions);
+                const fileData = selectedFiles[i];
+                const arrayBuffer = await fileData.file.arrayBuffer();
 
-                // Calculate compression
+                if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                    failedCompressions.push({ 
+                        name: fileData.name, 
+                        error: 'Empty file' 
+                    });
+                    continue;
+                }
+
+                // Load PDF
+                let pdfDoc;
+                try {
+                    pdfDoc = await PDFDocument.load(arrayBuffer);
+                } catch (loadError) {
+                    let errorMsg = 'Failed to load';
+
+                    if (loadError.message?.includes('encrypted') || loadError.message?.includes('password')) {
+                        errorMsg = 'Password-protected';
+                    } else if (loadError.message?.includes('Invalid')) {
+                        errorMsg = 'Corrupted or invalid PDF';
+                    }
+
+                    failedCompressions.push({ name: fileData.name, error: errorMsg });
+                    continue;
+                }
+
+                // Save with compression
+                const compressedBytes = await pdfDoc.save(compressionOptions);
+
+                if (!compressedBytes || compressedBytes.length === 0) {
+                    failedCompressions.push({ 
+                        name: fileData.name, 
+                        error: 'Compression produced empty file' 
+                    });
+                    continue;
+                }
+
                 const originalSize = fileData.size;
-                const compressedSize = result.bytes.length;
-                const savings = originalSize - compressedSize;
-                const savingsPercent = ((savings / originalSize) * 100).toFixed(1);
+                const compressedSize = compressedBytes.length;
+                const reduction = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
 
-                totalSavings += savings;
+                // Generate filename
+                const baseName = fileData.name.replace(/\.pdf$/i, '');
+                const compressedFileName = `${baseName}_compressed`;
 
-                // Update stats
-                const statsDiv = document.getElementById('compressionStats');
-                statsDiv.innerHTML = `
-                    <div>Original: <strong>${formatFileSize(originalSize)}</strong></div>
-                    <div>Compressed: <strong>${formatFileSize(compressedSize)}</strong></div>
-                    <div>Saved: <strong>${savingsPercent}%</strong></div>
-                `;
-
-                // Download
-                const outputName = fileData.name.replace('.pdf', '_compressed.pdf');
-                await downloadFileWithDelay(result.bytes, outputName, i * 300);
-                successCount++;
-
+                successfulCompressions.push({
+                    bytes: compressedBytes,
+                    filename: compressedFileName,
+                    originalSize: originalSize,
+                    compressedSize: compressedSize,
+                    reduction: reduction
+                });
             } catch (error) {
-                console.error(`Error compressing ${fileData.name}:`, error);
+                console.error('Error compressing file:', selectedFiles[i].name, error);
+                failedCompressions.push({ 
+                    name: selectedFiles[i].name, 
+                    error: 'Compression failed' 
+                });
             }
         }
 
-        // Show success
-        setTimeout(() => {
-            processingSection.style.display = 'none';
-            filesSection.style.display = 'block';
-            showSuccessMessage(successCount, totalSavings);
-        }, 500);
+        if (successfulCompressions.length === 0) {
+            throw new Error('No files could be compressed. Please check the files and try again.');
+        }
+
+        // Download compressed PDFs using shared utility
+        const results = await downloadMultiplePDFs(
+            successfulCompressions.map(c => ({ 
+                bytes: c.bytes, 
+                filename: c.filename 
+            })), 
+            100
+        );
+
+        // Calculate average compression
+        const avgReduction = (
+            successfulCompressions.reduce((sum, c) => sum + parseFloat(c.reduction), 0) / 
+            successfulCompressions.length
+        ).toFixed(1);
+
+        let successMsg = `Successfully compressed ${successfulCompressions.length} out of ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}.`;
+        successMsg += `\nAverage size reduction: ${avgReduction}%`;
+
+        if (failedCompressions.length > 0 || results.failed > 0) {
+            const allFailures = [
+                ...failedCompressions.map(f => `• ${f.name}: ${f.error}`),
+                ...results.errors.map(e => `• ${e.filename}: ${e.error}`)
+            ];
+
+            if (allFailures.length > 0) {
+                successMsg += '\n\nFailed compressions:\n' + allFailures.join('\n');
+            }
+
+            showWarningMessage(successMsg);
+        } else {
+            showSuccessMessage(successMsg);
+        }
+
+        clearAllFiles();
 
     } catch (error) {
-        console.error('Error during compression:', error);
-        alert('An error occurred during compression. Please try again.');
-        processingSection.style.display = 'none';
-        filesSection.style.display = 'block';
+        console.error('Error compressing PDFs:', error);
+        showErrorMessage(error.message || 'An error occurred while compressing PDFs. Please try again.');
+    } finally {
+        isProcessing = false;
+        setProcessingState(false, compressButton, processingSection, 'Compress PDFs', 'Compressing...');
     }
 }
 
-// Compress Single PDF
-async function compressPDF(fileData, options) {
-    const arrayBuffer = await fileData.file.arrayBuffer();
-    const pdfDoc = await PDFDocument.load(arrayBuffer);
+// ============================================
+// GLOBAL ERROR HANDLERS
+// ============================================
 
-    // Apply compression based on options
-    if (options.targetSize) {
-        // Target size compression (iterative approach)
-        return await compressToTargetSize(pdfDoc, options.targetSize, fileData.size);
-    } else {
-        // Level-based compression
-        return await compressByLevel(pdfDoc, options.level);
+window.addEventListener('error', (event) => {
+    console.error('Global error:', event.error);
+    if (isProcessing) {
+        isProcessing = false;
+        setProcessingState(false, compressButton, processingSection, 'Compress PDFs', 'Compressing...');
+        showErrorMessage('An unexpected error occurred. Please try again.');
     }
-}
+});
 
-// Compress by Level
-async function compressByLevel(pdfDoc, level) {
-    // Create a new PDF with compression
-    const compressedPdf = await PDFDocument.create();
-
-    // Copy all pages
-    const pageIndices = Array.from({ length: pdfDoc.getPageCount() }, (_, i) => i);
-    const copiedPages = await compressedPdf.copyPages(pdfDoc, pageIndices);
-
-    copiedPages.forEach(page => {
-        compressedPdf.addPage(page);
-    });
-
-    // Save with compression options
-    const saveOptions = {
-        useObjectStreams: level < 0.8, // Use object streams for better compression
-        addDefaultPage: false,
-        objectsPerTick: 50,
-    };
-
-    const bytes = await compressedPdf.save(saveOptions);
-    return { bytes };
-}
-
-// Compress to Target Size (best effort)
-async function compressToTargetSize(pdfDoc, targetSize, originalSize) {
-    // If original is already smaller, just return optimized version
-    if (originalSize <= targetSize) {
-        const bytes = await pdfDoc.save({ useObjectStreams: true });
-        return { bytes };
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    if (isProcessing) {
+        isProcessing = false;
+        setProcessingState(false, compressButton, processingSection, 'Compress PDFs', 'Compressing...');
+        showErrorMessage('An unexpected error occurred. Please try again.');
     }
+});
 
-    // Try aggressive compression
-    const ratio = targetSize / originalSize;
-    let level = ratio > 0.5 ? 0.7 : 0.3; // Estimate compression level needed
+// ============================================
+// INITIALIZATION COMPLETE
+// ============================================
 
-    const result = await compressByLevel(pdfDoc, level);
-
-    // Check if we met the target (with 10% tolerance)
-    if (result.bytes.length <= targetSize * 1.1) {
-        return result;
-    }
-
-    // If still too large, try maximum compression
-    return await compressByLevel(pdfDoc, 0.2);
-}
-
-// Download File with Delay
-function downloadFileWithDelay(data, filename, delay) {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            const blob = new Blob([data], { type: 'application/pdf' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            resolve();
-        }, delay);
-    });
-}
-
-// Show Success Message
-function showSuccessMessage(fileCount, totalSavings) {
-    const savingsText = totalSavings > 0 ? ` Saved ${formatFileSize(totalSavings)} total!` : '';
-
-    const message = document.createElement('div');
-    message.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: #1a1a1a;
-        border: 1px solid #2dff8f;
-        border-radius: 12px;
-        padding: 24px 32px;
-        color: #f0f6fc;
-        font-size: 18px;
-        font-weight: 600;
-        z-index: 1000;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-        max-width: 90%;
-    `;
-    message.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="color: #2dff8f; flex-shrink: 0;">
-                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>${fileCount} PDF${fileCount > 1 ? 's' : ''} compressed successfully!${savingsText}</span>
-        </div>
-    `;
-
-    document.body.appendChild(message);
-
-    setTimeout(() => {
-        message.style.transition = 'opacity 0.3s ease';
-        message.style.opacity = '0';
-        setTimeout(() => {
-            document.body.removeChild(message);
-        }, 300);
-    }, 3500);
-}
-
-// Format File Size
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
+console.log('✅ Compress PDF Module Loaded (Deduplicated)');
+console.log('   Using shared-utils.js for common functions');

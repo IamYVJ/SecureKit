@@ -1,6 +1,7 @@
 // ============================================
-// SPLIT PDF - ENHANCED ERROR HANDLING
+// SPLIT PDF - ENHANCED & DEDUPLICATED
 // SecureKit - Client-Side PDF Processing
+// Uses shared-utils.js for common functions
 // ============================================
 
 const { PDFDocument } = PDFLib;
@@ -34,37 +35,15 @@ const rangesList = document.getElementById('rangesList');
 // INITIALIZATION
 // ============================================
 
-// Set default filename with error handling
-function getDefaultFilename() {
-    try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return `SplitPDF_${year}${month}${day}`;
-    } catch (error) {
-        console.error('Error generating default filename:', error);
-        return 'SplitPDF';
-    }
-}
-
 try {
-    baseFilename.value = getDefaultFilename();
+    // Set default filename using shared utility
+    baseFilename.value = getDefaultFilename('SplitPDF');
 } catch (error) {
     console.error('Error setting default filename:', error);
 }
 
-// Accordion Toggle with error handling
-if (accordionToggle && accordionContent) {
-    accordionToggle.addEventListener('click', () => {
-        try {
-            accordionToggle.classList.toggle('active');
-            accordionContent.classList.toggle('active');
-        } catch (error) {
-            console.error('Error toggling accordion:', error);
-        }
-    });
-}
+// Setup accordion using shared utility
+setupAccordion(accordionToggle, accordionContent);
 
 // ============================================
 // EVENT LISTENERS
@@ -92,92 +71,32 @@ try {
     removeButton?.addEventListener('click', removeFile);
     cancelButton?.addEventListener('click', removeFile);
     splitButton?.addEventListener('click', splitPDF);
-
-    // Radio button change handlers
-    const radioButtons = document.querySelectorAll('input[name="splitMode"]');
-    radioButtons.forEach(radio => {
-        radio.addEventListener('change', handleRadioChange);
-    });
-
-    // Add range button
     addRangeButton?.addEventListener('click', addRangeInput);
+
+    // Setup radio buttons using shared utility
+    setupRadioButtons('splitMode', (e) => {
+        handleRadioToggle(e, '.radio-input-wrapper');
+    });
 
     // Initialize with one range
     addRangeInput();
-
 } catch (error) {
     console.error('Error setting up event listeners:', error);
     showErrorMessage('Failed to initialize the application. Please refresh the page.');
 }
 
-function handleRadioChange(e) {
-    try {
-        // Hide all input wrappers
-        document.querySelectorAll('.radio-input-wrapper').forEach(wrapper => {
-            wrapper.style.display = 'none';
-        });
-
-        // Show the selected one
-        const selectedRadio = e.target;
-        const wrapper = selectedRadio.parentElement.querySelector('.radio-input-wrapper');
-        if (wrapper) {
-            wrapper.style.display = 'block';
-        }
-    } catch (error) {
-        console.error('Error in handleRadioChange:', error);
+// Setup drag and drop using shared utility
+setupDragAndDrop(uploadArea, (files) => {
+    if (files.length > 1) {
+        showWarningMessage('Please drop only one PDF file at a time. Using the first file.');
     }
-}
-
-// Drag and Drop with error handling
-try {
-    uploadArea?.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.classList.add('drag-over');
-    });
-
-    uploadArea?.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('drag-over');
-    });
-
-    uploadArea?.addEventListener('drop', (e) => {
-        try {
-            e.preventDefault();
-            uploadArea.classList.remove('drag-over');
-
-            const files = Array.from(e.dataTransfer.files).filter(file => {
-                if (file.type === 'application/pdf') {
-                    return true;
-                }
-                console.warn('Skipping non-PDF file:', file.name);
-                return false;
-            });
-
-            if (files.length === 0) {
-                showWarningMessage('Please drop a PDF file only.');
-                return;
-            }
-
-            if (files.length > 1) {
-                showWarningMessage('Please drop only one PDF file at a time. Using the first file.');
-            }
-
-            if (files.length > 0) {
-                handleFileSelect({ target: { files: [files[0]] } });
-            }
-        } catch (error) {
-            console.error('Error handling file drop:', error);
-            showErrorMessage('Failed to process dropped file. Please try using the file selector instead.');
-        }
-    });
-} catch (error) {
-    console.error('Error setting up drag and drop:', error);
-}
+    handleFileSelect({ target: { files: [files[0]] } });
+}, { allowMultiple: false });
 
 // ============================================
-// FILE HANDLING WITH ENHANCED ERROR HANDLING
+// FILE HANDLING
 // ============================================
 
-// Handle File Selection
 function handleFileSelect(e) {
     try {
         if (isProcessing) {
@@ -195,8 +114,8 @@ function handleFileSelect(e) {
             return;
         }
 
-        // Validate it's a PDF
-        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        // Validate it's a PDF using shared utility
+        if (!isPDF(file)) {
             showErrorMessage(`"${file.name}" is not a PDF file. Please select a valid PDF.`);
             fileInput.value = '';
             return;
@@ -204,7 +123,6 @@ function handleFileSelect(e) {
 
         // Validate file size
         const validation = validateFileSize(file, true);
-
         if (!validation.valid) {
             showErrorMessage(validation.error);
             fileInput.value = '';
@@ -217,7 +135,6 @@ function handleFileSelect(e) {
 
         handleFile(file);
         fileInput.value = '';
-
     } catch (error) {
         console.error('Error in handleFileSelect:', error);
         showErrorMessage('An error occurred while selecting the file. Please try again.');
@@ -225,7 +142,6 @@ function handleFileSelect(e) {
     }
 }
 
-// Handle File with comprehensive error handling
 async function handleFile(file) {
     try {
         if (!file || !(file instanceof File)) {
@@ -244,49 +160,22 @@ async function handleFile(file) {
             showWarningMessage(memoryCheck.warning);
         }
 
-        // Load the PDF
-        const arrayBuffer = await file.arrayBuffer();
+        // Load PDF using shared utility
+        const result = await loadPDFWithValidation(file);
 
-        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-            showErrorMessage('File appears to be empty or corrupted.');
+        if (result.error) {
+            showErrorMessage(result.error);
             return;
         }
 
-        // Try to load as PDF
-        try {
-            pdfDoc = await PDFDocument.load(arrayBuffer, {
-                ignoreEncryption: false
-            });
-        } catch (loadError) {
-            console.error('PDF loading error:', loadError);
-
-            let errorMsg = 'Failed to load PDF file.';
-            if (loadError.message.includes('encrypted') || loadError.message.includes('password')) {
-                errorMsg = 'This PDF is password-protected and cannot be processed.\nPlease remove the password protection first.';
-            } else if (loadError.message.includes('Invalid') || loadError.message.includes('parse')) {
-                errorMsg = 'This file appears to be corrupted or is not a valid PDF.\nPlease try a different file.';
-            } else {
-                errorMsg = `Error loading PDF: ${loadError.message.substring(0, 100)}`;
-            }
-
-            showErrorMessage(errorMsg);
-            return;
-        }
-
-        const pageCount = pdfDoc.getPageCount();
-
-        if (pageCount === 0) {
-            showErrorMessage('This PDF has no pages.');
-            pdfDoc = null;
-            return;
-        }
+        pdfDoc = result.pdfDoc;
 
         selectedFile = {
             file: file,
             name: file.name,
             size: formatFileSize(file.size),
             sizeBytes: file.size,
-            pageCount: pageCount
+            pageCount: result.pageCount
         };
 
         // Add size warning if applicable
@@ -296,11 +185,10 @@ async function handleFile(file) {
         }
 
         updateUI();
-
     } catch (error) {
         console.error('Error loading PDF:', error);
-
         let errorMsg = 'An error occurred while loading the PDF.';
+
         if (error.name === 'QuotaExceededError') {
             errorMsg = 'Not enough memory to load this file. Please close other tabs and try again.';
         } else if (error.message) {
@@ -314,10 +202,9 @@ async function handleFile(file) {
 }
 
 // ============================================
-// UI UPDATE FUNCTIONS
+// UI FUNCTIONS
 // ============================================
 
-// Update UI with error handling
 function updateUI() {
     try {
         if (selectedFile) {
@@ -334,7 +221,6 @@ function updateUI() {
     }
 }
 
-// Render File Display with error handling
 function renderFileDisplay() {
     try {
         if (!fileDisplay || !selectedFile) {
@@ -344,595 +230,288 @@ function renderFileDisplay() {
 
         fileDisplay.innerHTML = `
             <div class="file-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/>
-                    <path d="M14 2v6h6" stroke="currentColor" stroke-width="2"/>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
                 </svg>
             </div>
-            <div class="file-details">
-                <div class="file-name">${escapeHtml(selectedFile.name)}</div>
-                <div class="file-metadata">${selectedFile.size} • ${selectedFile.pageCount} pages</div>
+            <div class="file-info-display">
+                <div class="file-name-display">${escapeHtml(selectedFile.name)}</div>
+                <div class="file-details-display">
+                    ${selectedFile.size} • ${selectedFile.pageCount} page${selectedFile.pageCount !== 1 ? 's' : ''}
+                </div>
             </div>
         `;
-
-        // Add size warning if exists
-        if (selectedFile.sizeWarning) {
-            const warningDiv = document.createElement('div');
-            warningDiv.className = 'file-size-warning';
-            warningDiv.style.cssText = `
-                width: 100%;
-                padding: 12px;
-                margin-top: 16px;
-                background-color: rgba(255, 152, 0, 0.1);
-                border: 1px solid #ff9800;
-                border-radius: 8px;
-                color: #ff9800;
-                font-size: 13px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            `;
-            warningDiv.innerHTML = `
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0;">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2"/>
-                    <path d="M12 9v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <span>${escapeHtml(selectedFile.sizeWarning)}</span>
-            `;
-            fileDisplay.appendChild(warningDiv);
-        }
-
     } catch (error) {
         console.error('Error rendering file display:', error);
-        showErrorMessage('Failed to display file information.');
+    }
+}
+
+function removeFile() {
+    try {
+        selectedFile = null;
+        pdfDoc = null;
+        updateUI();
+    } catch (error) {
+        console.error('Error removing file:', error);
+        showErrorMessage('Failed to remove file. Please try again.');
     }
 }
 
 // ============================================
-// RANGE MANAGEMENT
+// RANGE INPUT MANAGEMENT
 // ============================================
 
-// Add Range Input with error handling
 function addRangeInput() {
     try {
-        if (!rangesList) {
-            console.error('Ranges list element not found');
-            return;
-        }
-
-        const rangeId = Date.now() + Math.random();
         const rangeItem = document.createElement('div');
         rangeItem.className = 'range-item';
-        rangeItem.dataset.rangeId = rangeId;
+
+        const rangeId = 'range_' + Date.now();
 
         rangeItem.innerHTML = `
-            <input type="text" class="split-input range-input" placeholder="e.g., 1-5" data-range-id="${rangeId}">
-            <button class="remove-range-button" onclick="removeRange('${rangeId}')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <input type="text" 
+                   class="range-input" 
+                   id="${rangeId}"
+                   placeholder="e.g., 1-5 or 1,3,5">
+            <button class="remove-range" title="Remove range">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
             </button>
         `;
 
-        rangesList.appendChild(rangeItem);
-        ranges.push(rangeId);
+        const removeBtn = rangeItem.querySelector('.remove-range');
+        removeBtn.addEventListener('click', () => {
+            if (rangesList.children.length > 1) {
+                rangeItem.remove();
+            } else {
+                showWarningMessage('At least one range input is required.');
+            }
+        });
 
+        rangesList.appendChild(rangeItem);
     } catch (error) {
         console.error('Error adding range input:', error);
     }
 }
 
-// Remove Range Input with error handling
-function removeRange(rangeId) {
-    try {
-        if (ranges.length > 1) {
-            const rangeItem = document.querySelector(`[data-range-id="${rangeId}"]`);
-            if (rangeItem) {
-                rangeItem.remove();
-                ranges = ranges.filter(id => id != rangeId);
-            }
-        } else {
-            showWarningMessage('At least one range is required.');
-        }
-    } catch (error) {
-        console.error('Error removing range:', error);
-    }
-}
-
 // ============================================
-// PAGE SELECTION PARSING
-// ============================================
-
-function parsePageSelection(selection, totalPages) {
-    try {
-        if (!selection || typeof selection !== 'string') {
-            throw new Error('Invalid page selection');
-        }
-
-        const pages = new Set();
-        const parts = selection.split(',').map(s => s.trim()).filter(s => s);
-
-        if (parts.length === 0) {
-            throw new Error('Empty page selection');
-        }
-
-        for (const part of parts) {
-            if (part.includes('-')) {
-                // Range like "2-5"
-                const [start, end] = part.split('-').map(n => parseInt(n.trim()));
-
-                if (isNaN(start) || isNaN(end)) {
-                    throw new Error(`Invalid range format: "${part}". Use numbers only (e.g., "1-5").`);
-                }
-
-                if (start < 1 || end > totalPages) {
-                    throw new Error(`Range "${part}" is out of bounds. PDF has ${totalPages} pages.`);
-                }
-
-                if (start > end) {
-                    throw new Error(`Invalid range "${part}". Start page (${start}) cannot be greater than end page (${end}).`);
-                }
-
-                for (let i = start; i <= end; i++) {
-                    pages.add(i - 1); // Convert to 0-indexed
-                }
-            } else {
-                // Single page like "7"
-                const page = parseInt(part);
-
-                if (isNaN(page)) {
-                    throw new Error(`Invalid page number: "${part}". Use numbers only.`);
-                }
-
-                if (page < 1 || page > totalPages) {
-                    throw new Error(`Page ${page} is out of bounds. PDF has ${totalPages} pages (1-${totalPages}).`);
-                }
-
-                pages.add(page - 1); // Convert to 0-indexed
-            }
-        }
-
-        if (pages.size === 0) {
-            throw new Error('No valid pages selected.');
-        }
-
-        return Array.from(pages).sort((a, b) => a - b);
-
-    } catch (error) {
-        // Re-throw with context
-        throw error;
-    }
-}
-
-// ============================================
-// FILE OPERATIONS
-// ============================================
-
-// Remove File with error handling
-function removeFile() {
-    try {
-        if (isProcessing) {
-            showWarningMessage('Please wait for the current operation to complete.');
-            return;
-        }
-
-        selectedFile = null;
-        pdfDoc = null;
-        updateUI();
-        clearAllMessages();
-
-    } catch (error) {
-        console.error('Error removing file:', error);
-        showErrorMessage('Failed to remove file. Please refresh the page.');
-    }
-}
-
-// ============================================
-// SPLIT PDF WITH COMPREHENSIVE ERROR HANDLING
+// SPLIT PDF FUNCTION
 // ============================================
 
 async function splitPDF() {
-    // Prevent multiple simultaneous splits
     if (isProcessing) {
-        showWarningMessage('A split operation is already in progress. Please wait.');
+        showWarningMessage('Split operation already in progress. Please wait.');
         return;
     }
 
     try {
-        // Validate we have a file
         if (!selectedFile || !pdfDoc) {
-            showErrorMessage('Please select a PDF file first.');
+            showErrorMessage('Please select a PDF file to split.');
             return;
         }
 
         const splitMode = document.querySelector('input[name="splitMode"]:checked')?.value;
+
         if (!splitMode) {
             showErrorMessage('Please select a split mode.');
             return;
         }
 
-        const totalPages = selectedFile.pageCount;
-
-        // Validate filename
-        let filename = baseFilename.value.trim();
-        if (!filename) {
-            filename = getDefaultFilename();
-        }
-
-        // Sanitize filename
-        filename = sanitizeFilename(filename);
-        if (!filename) {
-            showWarningMessage('Invalid filename. Using default name.');
-            filename = getDefaultFilename();
-        }
-
-        let splitRanges = [];
-        const errors = [];
-
-        try {
-            if (splitMode === 'all') {
-                // Split each page
-                for (let i = 0; i < totalPages; i++) {
-                    splitRanges.push([i]);
-                }
-            } else if (splitMode === 'custom') {
-                const customPagesValue = customPages?.value.trim();
-                if (!customPagesValue) {
-                    showErrorMessage('Please enter pages to extract (e.g., "1-3,5,7").');
-                    return;
-                }
-
-                try {
-                    const pageIndices = parsePageSelection(customPagesValue, totalPages);
-                    for (const pageIndex of pageIndices) {
-                        splitRanges.push([pageIndex]);
-                    }
-                } catch (parseError) {
-                    showErrorMessage(parseError.message);
-                    return;
-                }
-            } else if (splitMode === 'ranges') {
-                const rangeInputs = document.querySelectorAll('.range-input');
-
-                rangeInputs.forEach((input, index) => {
-                    const rangeValue = input.value.trim();
-                    if (rangeValue) {
-                        try {
-                            const pageIndices = parsePageSelection(rangeValue, totalPages);
-                            splitRanges.push(pageIndices);
-                        } catch (parseError) {
-                            errors.push(`Range ${index + 1}: ${parseError.message}`);
-                        }
-                    }
-                });
-
-                if (errors.length > 0) {
-                    showErrorMessage('Invalid ranges:\n' + errors.join('\n'));
-                    return;
-                }
-
-                if (splitRanges.length === 0) {
-                    showErrorMessage('Please enter at least one page range.');
-                    return;
-                }
-            } else if (splitMode === 'fixed') {
-                const fixedPagesValue = parseInt(fixedPages?.value);
-
-                if (isNaN(fixedPagesValue) || fixedPagesValue < 1) {
-                    showErrorMessage('Please enter a valid number of pages per split (minimum 1).');
-                    return;
-                }
-
-                if (fixedPagesValue > totalPages) {
-                    showErrorMessage(`Pages per split (${fixedPagesValue}) cannot exceed total pages (${totalPages}).`);
-                    return;
-                }
-
-                for (let i = 0; i < totalPages; i += fixedPagesValue) {
-                    const range = [];
-                    for (let j = i; j < Math.min(i + fixedPagesValue, totalPages); j++) {
-                        range.push(j);
-                    }
-                    splitRanges.push(range);
-                }
-            }
-        } catch (error) {
-            console.error('Error processing split configuration:', error);
-            showErrorMessage(`Error in page selection: ${error.message}`);
-            return;
-        }
-
-        if (splitRanges.length === 0) {
-            showErrorMessage('No pages selected for splitting.');
-            return;
-        }
-
-        // Warn if creating many files
-        if (splitRanges.length > 100) {
-            showWarningMessage(`Warning: This will create ${splitRanges.length} files. This may take a while.`, 3000);
-        }
-
-        // Estimate output size and check storage
-        const estimatedOutputSize = selectedFile.sizeBytes * splitRanges.length * 0.15; // Rough estimate
-        const storageCheck = await checkStorageQuota(estimatedOutputSize);
-        if (!storageCheck.hasSpace) {
-            showErrorMessage(storageCheck.error || 'Insufficient storage space for output files. Please free up some space.');
-            return;
-        }
-
-        // Set processing flag and show processing UI
         isProcessing = true;
-        fileSection.style.display = 'none';
-        processingSection.style.display = 'block';
+        setProcessingState(true, splitButton, processingSection, 'Split PDF', 'Splitting...');
 
-        // Process splits
-        const failedSplits = [];
-        let successCount = 0;
+        let splits = [];
 
-        for (let i = 0; i < splitRanges.length; i++) {
-            try {
-                const range = splitRanges[i];
+        // Determine splits based on mode
+        if (splitMode === 'all') {
+            for (let i = 0; i < selectedFile.pageCount; i++) {
+                splits.push({
+                    pages: [i],
+                    name: `page_${i + 1}`
+                });
+            }
+        } else if (splitMode === 'custom') {
+            const customInput = customPages?.value.trim();
 
-                if (!range || range.length === 0) {
-                    failedSplits.push({ index: i + 1, error: 'Empty range' });
-                    continue;
+            if (!customInput) {
+                throw new Error('Please enter page numbers for custom split.');
+            }
+
+            const result = parsePageSelection(customInput, selectedFile.pageCount);
+
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            if (result.pages.length === 0) {
+                throw new Error('No valid pages selected.');
+            }
+
+            splits.push({
+                pages: result.pages.map(p => p - 1),
+                name: 'custom_pages'
+            });
+        } else if (splitMode === 'ranges') {
+            const rangeInputs = document.querySelectorAll('.range-input');
+            const errors = [];
+
+            rangeInputs.forEach((input, idx) => {
+                const value = input.value.trim();
+                if (value) {
+                    const result = parsePageSelection(value, selectedFile.pageCount);
+
+                    if (result.error) {
+                        errors.push(`Range ${idx + 1}: ${result.error}`);
+                    } else if (result.pages.length > 0) {
+                        splits.push({
+                            pages: result.pages.map(p => p - 1),
+                            name: `range_${idx + 1}`
+                        });
+                    }
+                }
+            });
+
+            if (errors.length > 0) {
+                throw new Error('Invalid ranges:\n' + errors.join('\n'));
+            }
+
+            if (splits.length === 0) {
+                throw new Error('Please enter at least one valid range.');
+            }
+        } else if (splitMode === 'fixed') {
+            const pagesPerSplit = parseInt(fixedPages?.value);
+
+            if (isNaN(pagesPerSplit) || pagesPerSplit < 1) {
+                throw new Error('Please enter a valid number of pages per split (minimum 1).');
+            }
+
+            if (pagesPerSplit > selectedFile.pageCount) {
+                throw new Error(`Pages per split (${pagesPerSplit}) cannot exceed total pages (${selectedFile.pageCount}).`);
+            }
+
+            for (let i = 0; i < selectedFile.pageCount; i += pagesPerSplit) {
+                const endPage = Math.min(i + pagesPerSplit, selectedFile.pageCount);
+                const pages = [];
+
+                for (let j = i; j < endPage; j++) {
+                    pages.push(j);
                 }
 
+                splits.push({
+                    pages: pages,
+                    name: `part_${Math.floor(i / pagesPerSplit) + 1}`
+                });
+            }
+        }
+
+        if (splits.length === 0) {
+            throw new Error('No splits to create. Please check your settings.');
+        }
+
+        // Warn for large number of splits
+        if (splits.length > 100) {
+            const confirmed = confirm(`This will create ${splits.length} PDF files. This may take a while. Continue?`);
+            if (!confirmed) {
+                throw new Error('Split operation cancelled by user.');
+            }
+        }
+
+        // Create PDF splits
+        const pdfDataArray = [];
+        const failedSplits = [];
+
+        for (let i = 0; i < splits.length; i++) {
+            try {
+                const split = splits[i];
                 const newPdf = await PDFDocument.create();
-                const copiedPages = await newPdf.copyPages(pdfDoc, range);
+
+                const copiedPages = await newPdf.copyPages(pdfDoc, split.pages);
                 copiedPages.forEach(page => newPdf.addPage(page));
 
                 const pdfBytes = await newPdf.save();
 
                 if (!pdfBytes || pdfBytes.length === 0) {
-                    failedSplits.push({ index: i + 1, error: 'Empty output' });
+                    failedSplits.push({ name: split.name, error: 'Empty output' });
                     continue;
                 }
 
-                // Generate filename
-                const outputFilename = `${filename}_${i + 1}.pdf`;
-                downloadFile(pdfBytes, outputFilename);
-                successCount++;
+                const baseNameValue = baseFilename.value.trim() || 'SplitPDF';
+                const filename = `${baseNameValue}_${split.name}`;
 
-                // Small delay between downloads to prevent browser blocking
-                if (i < splitRanges.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-
+                pdfDataArray.push({
+                    bytes: pdfBytes,
+                    filename: filename
+                });
             } catch (error) {
-                console.error(`Error creating split ${i + 1}:`, error);
-                failedSplits.push({ index: i + 1, error: error.message.substring(0, 50) });
+                console.error('Error creating split:', splits[i].name, error);
+                failedSplits.push({ name: splits[i].name, error: 'Failed to create' });
             }
         }
 
-        // Reset UI
-        setTimeout(() => {
-            try {
-                processingSection.style.display = 'none';
-                fileSection.style.display = 'block';
-                isProcessing = false;
+        if (pdfDataArray.length === 0) {
+            throw new Error('Failed to create any PDF splits. Please try again.');
+        }
 
-                // Show result message
-                if (successCount === 0) {
-                    showErrorMessage('Failed to create any split files. Please try again.');
-                } else if (failedSplits.length > 0) {
-                    showWarningMessage(
-                        `Created ${successCount} out of ${splitRanges.length} files successfully.\n${failedSplits.length} split(s) failed.`,
-                        5000
-                    );
-                } else {
-                    showSuccessMessage(`PDF split successfully into ${successCount} file${successCount > 1 ? 's' : ''}!`);
-                }
+        // Download all PDFs using shared utility
+        const results = await downloadMultiplePDFs(pdfDataArray, 100);
 
-            } catch (resetError) {
-                console.error('Error resetting UI:', resetError);
-                isProcessing = false;
+        let successMsg = `Successfully created ${results.successful} out of ${splits.length} split${splits.length !== 1 ? 's' : ''}.`;
+
+        if (results.failed > 0 || failedSplits.length > 0) {
+            const allFailures = [
+                ...failedSplits.map(f => `• ${f.name}: ${f.error}`),
+                ...results.errors.map(e => `• ${e.filename}: ${e.error}`)
+            ];
+
+            if (allFailures.length > 0) {
+                successMsg += '\n\nFailed splits:\n' + allFailures.join('\n');
             }
-        }, 500);
+
+            showWarningMessage(successMsg);
+        } else {
+            showSuccessMessage(successMsg);
+        }
+
+        removeFile();
 
     } catch (error) {
         console.error('Error splitting PDF:', error);
-
-        // Reset processing flag
+        showErrorMessage(error.message || 'An error occurred while splitting the PDF. Please try again.');
+    } finally {
         isProcessing = false;
-
-        // Reset UI
-        processingSection.style.display = 'none';
-        fileSection.style.display = 'block';
-
-        // Show error message
-        let errorMsg = 'An error occurred while splitting the PDF.';
-        if (error.name === 'QuotaExceededError') {
-            errorMsg = 'Not enough storage space. Please free up some space and try again.';
-        } else if (error.message) {
-            errorMsg = error.message;
-        }
-
-        showErrorMessage(errorMsg);
+        setProcessingState(false, splitButton, processingSection, 'Split PDF', 'Splitting...');
     }
 }
 
 // ============================================
-// UTILITY FUNCTIONS
+// GLOBAL ERROR HANDLERS
 // ============================================
 
-// Download File with error handling
-function downloadFile(data, filename) {
-    try {
-        if (!data || data.length === 0) {
-            throw new Error('No data to download');
-        }
-
-        if (!filename || typeof filename !== 'string') {
-            filename = 'download.pdf';
-        }
-
-        const blob = new Blob([data], { type: 'application/pdf' });
-
-        if (blob.size === 0) {
-            throw new Error('Generated file is empty');
-        }
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => {
-            try {
-                URL.revokeObjectURL(url);
-            } catch (revokeError) {
-                console.warn('Failed to revoke object URL:', revokeError);
-            }
-        }, 100);
-
-    } catch (error) {
-        console.error('Error downloading file:', error);
-        throw error;
-    }
-}
-
-// Sanitize Filename
-function sanitizeFilename(filename) {
-    try {
-        if (!filename || typeof filename !== 'string') {
-            return '';
-        }
-
-        // Remove .pdf extension if present
-        let name = filename.replace(/\.pdf$/i, '');
-
-        // Replace invalid characters with underscore
-        name = name.replace(/[^a-z0-9_\-\s]/gi, '_');
-
-        // Replace multiple spaces/underscores with single
-        name = name.replace(/[_\s]+/g, '_');
-
-        // Limit length to 200 characters
-        name = name.substring(0, 200);
-
-        // Remove leading/trailing spaces and underscores
-        name = name.replace(/^[_\s]+|[_\s]+$/g, '');
-
-        return name;
-
-    } catch (error) {
-        console.error('Error sanitizing filename:', error);
-        return '';
-    }
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    try {
-        if (typeof text !== 'string') {
-            text = String(text);
-        }
-
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-
-    } catch (error) {
-        console.error('Error escaping HTML:', error);
-        return text;
-    }
-}
-
-// Format File Size
-function formatFileSize(bytes) {
-    try {
-        if (typeof bytes !== 'number' || bytes < 0) {
-            return '0 Bytes';
-        }
-
-        if (bytes === 0) return '0 Bytes';
-
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        if (i < 0 || i >= sizes.length) {
-            return bytes + ' Bytes';
-        }
-
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-
-    } catch (error) {
-        console.error('Error formatting file size:', error);
-        return bytes + ' Bytes';
-    }
-}
-
-// ============================================
-// INITIALIZATION & ERROR DETECTION
-// ============================================
-
-// Check for browser compatibility on page load
-window.addEventListener('DOMContentLoaded', () => {
-    try {
-        const compatibility = checkBrowserCompatibility();
-
-        if (!compatibility.supported) {
-            const errorMsg = `Your browser is missing required features: ${compatibility.missingFeatures.join(', ')}.\n\nPlease use a modern browser like Chrome, Firefox, Edge, or Safari.`;
-            showErrorMessage(errorMsg);
-
-            const toolPage = document.querySelector('.tool-page');
-            if (toolPage) {
-                toolPage.style.pointerEvents = 'none';
-                toolPage.style.opacity = '0.5';
-            }
-        } else {
-            console.log('✅ Browser compatibility check passed');
-        }
-
-        // Check if PDFLib is loaded
-        if (typeof PDFLib === 'undefined' || !PDFLib.PDFDocument) {
-            showErrorMessage('PDF library failed to load. Please refresh the page or check your internet connection.');
-
-            const toolPage = document.querySelector('.tool-page');
-            if (toolPage) {
-                toolPage.style.pointerEvents = 'none';
-                toolPage.style.opacity = '0.5';
-            }
-        }
-
-    } catch (error) {
-        console.error('Error during initialization:', error);
-        showErrorMessage('Failed to initialize the application. Please refresh the page.');
-    }
-});
-
-// Global error handler
 window.addEventListener('error', (event) => {
-    console.error('Global error caught:', event.error);
-
-    if (event.message && event.message.includes('Script error')) {
-        return;
-    }
-
+    console.error('Global error:', event.error);
     if (isProcessing) {
         isProcessing = false;
-        processingSection.style.display = 'none';
-        fileSection.style.display = 'block';
+        setProcessingState(false, splitButton, processingSection, 'Split PDF', 'Splitting...');
         showErrorMessage('An unexpected error occurred. Please try again.');
     }
 });
 
-// Handle unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
-
     if (isProcessing) {
         isProcessing = false;
-        processingSection.style.display = 'none';
-        fileSection.style.display = 'block';
-        showErrorMessage('An error occurred during processing. Please try again.');
+        setProcessingState(false, splitButton, processingSection, 'Split PDF', 'Splitting...');
+        showErrorMessage('An unexpected error occurred. Please try again.');
     }
 });
 
-console.log('✅ Split PDF module loaded successfully');
+// ============================================
+// INITIALIZATION COMPLETE
+// ============================================
+
+console.log('✅ Split PDF Module Loaded (Deduplicated)');
+console.log('   Using shared-utils.js for common functions');
