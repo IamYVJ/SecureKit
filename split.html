@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split PDF - SecureKit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="split-style.css">
+</head>
+<body>
+    <div class="grain-overlay"></div>
+
+    <header>
+        <nav class="container">
+            <a href="index.html#hero" class="logo-link">
+                <span class="logo-text">Secure<span class="accent">Kit</span></span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="merge.html">Merge</a></li>
+                <li><a href="split.html">Split</a></li>
+                <li><a href="#compress">Compress</a></li>
+                <li><a href="#secure">Secure</a></li>
+                <li><a href="#pdf-to-image">PDF to Image</a></li>
+                <li><a href="#image-to-pdf">Image to PDF</a></li>
+                <li><a href="index.html#about">About</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="tool-page">
+        <div class="container">
+            <div class="tool-header-section">
+                <div class="tool-icon-large">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/>
+                        <path d="M14 2v6h6M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h1 class="tool-title">Split <span class="accent">PDF</span></h1>
+                <p class="tool-description">Extract pages or divide a PDF document into multiple files. All processing happens locally in your browser.</p>
+                <div class="security-badge">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                    <span>100% Local Processing - Your files never leave your device</span>
+                </div>
+            </div>
+
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-area" id="uploadArea">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" class="upload-icon">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h3>Drop PDF file here</h3>
+                    <p>or click to browse</p>
+                    <input type="file" id="fileInput" accept=".pdf" hidden>
+                    <button class="browse-button" id="browseButton">
+                        <span>Select PDF File</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="file-section" id="fileSection" style="display: none;">
+                <div class="file-header">
+                    <h3>Selected File</h3>
+                    <button class="secondary-button" id="removeButton">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span>Remove</span>
+                    </button>
+                </div>
+
+                <div class="file-display" id="fileDisplay"></div>
+
+                <div class="split-options-section">
+                    <h3>Split Options</h3>
+
+                    <div class="split-mode-options">
+                        <label class="radio-option">
+                            <input type="radio" name="splitMode" value="all" checked>
+                            <div class="radio-content">
+                                <div class="radio-header">
+                                    <span class="radio-circle"></span>
+                                    <span class="radio-title">Extract all pages separately</span>
+                                </div>
+                                <p class="radio-description">Create individual PDF files for each page</p>
+                            </div>
+                        </label>
+
+                        <label class="radio-option">
+                            <input type="radio" name="splitMode" value="custom">
+                            <div class="radio-content">
+                                <div class="radio-header">
+                                    <span class="radio-circle"></span>
+                                    <span class="radio-title">Extract specific pages</span>
+                                </div>
+                                <p class="radio-description">Choose which pages to extract (e.g., 1-3,5,7)</p>
+                                <div class="radio-input-wrapper" style="display: none;">
+                                    <input type="text" class="page-input" id="customPages" placeholder="e.g., 1-3,5,7-10">
+                                    <p class="input-hint">Specify pages or ranges separated by commas</p>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="radio-option">
+                            <input type="radio" name="splitMode" value="ranges">
+                            <div class="radio-content">
+                                <div class="radio-header">
+                                    <span class="radio-circle"></span>
+                                    <span class="radio-title">Extract custom ranges</span>
+                                </div>
+                                <p class="radio-description">Define multiple ranges to extract as separate PDFs</p>
+                                <div class="radio-input-wrapper" style="display: none;">
+                                    <div id="rangesList" class="ranges-list"></div>
+                                    <button class="add-range-button" id="addRangeButton">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                            <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                        <span>Add Range</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="radio-option">
+                            <input type="radio" name="splitMode" value="fixed">
+                            <div class="radio-content">
+                                <div class="radio-header">
+                                    <span class="radio-circle"></span>
+                                    <span class="radio-title">Split into fixed page chunks</span>
+                                </div>
+                                <p class="radio-description">Divide PDF into equal-sized chunks</p>
+                                <div class="radio-input-wrapper" style="display: none;">
+                                    <input type="number" class="number-input" id="fixedPages" placeholder="Pages per file" min="1" value="1">
+                                    <p class="input-hint">Number of pages per output file</p>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="options-accordion">
+                    <button class="accordion-header" id="accordionToggle">
+                        <span class="accordion-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Output Settings
+                        </span>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <div class="accordion-content" id="accordionContent">
+                        <div class="option-group">
+                            <label for="baseFilename" class="input-label">Base filename</label>
+                            <input type="text" id="baseFilename" class="text-input" placeholder="SplitPDF_20260203">
+                            <p class="input-hint">Output files will be named as: basename_1.pdf, basename_2.pdf, etc.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="secondary-button" id="cancelButton">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span>Cancel</span>
+                    </button>
+                    <button class="primary-button" id="splitButton">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M14 2v6h6M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span>Split PDF</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="processing-section" id="processingSection" style="display: none;">
+                <div class="processing-card">
+                    <div class="spinner"></div>
+                    <h3 id="processingTitle">Splitting PDF...</h3>
+                    <p id="processingMessage">Please wait while we process your file</p>
+                    <div class="progress-info" id="progressInfo" style="display: none;">
+                        <div class="progress-text">Creating file <span id="currentFile">1</span> of <span id="totalFiles">1</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>How It Works</h3>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-number">1</div>
+                        <h4>Upload PDF</h4>
+                        <p>Select a single PDF file to split</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-number">2</div>
+                        <h4>Choose Method</h4>
+                        <p>Select how you want to split the PDF</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-number">3</div>
+                        <h4>Split & Download</h4>
+                        <p>Process and download your split PDFs</p>
+                    </div>
+                </div>
+
+                <div class="page-selection-guide">
+                    <h4>Page Selection Examples</h4>
+                    <div class="format-examples">
+                        <div class="format-item">
+                            <code>1-5</code>
+                            <span>Pages 1 through 5</span>
+                        </div>
+                        <div class="format-item">
+                            <code>2,5,8</code>
+                            <span>Individual pages 2, 5, and 8</span>
+                        </div>
+                        <div class="format-item">
+                            <code>1-3,7-9</code>
+                            <span>Pages 1-3 and 7-9</span>
+                        </div>
+                        <div class="format-item">
+                            <code>Fixed: 3</code>
+                            <span>Split every 3 pages</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <a href="index.html#hero" class="footer-logo-link">
+                        <span class="logo-text">Secure<span class="accent">Kit</span></span>
+                    </a>
+                    <p class="footer-tagline">Your data never leaves your device</p>
+                </div>
+                <div class="footer-info">
+                    <p>&copy; 2026 SecureKit</p>
+                    <p class="footer-note">Client-side PDF processing for everyone</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="split.js"></script>
+</body>
+</html>
