@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 * {
     margin: 0;
     padding: 0;
@@ -420,6 +418,15 @@ nav {
 
 .tool-button:hover svg {
     transform: translateX(4px);
+}
+
+.tool-button-disabled,
+.tool-button-disabled:hover {
+    background-color: transparent;
+    color: var(--text-muted);
+    border-color: var(--border-color);
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* About Section */

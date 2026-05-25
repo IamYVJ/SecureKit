@@ -469,10 +469,16 @@ function parsePageSelection(input, maxPages) {
  */
 function setProcessingState(processing, button, processingSection, originalText, processingText) {
     try {
+        const labelElement = button?.querySelector('span');
+
         if (processing) {
             if (button) {
                 button.disabled = true;
-                button.textContent = processingText || 'Processing...';
+                if (labelElement) {
+                    labelElement.textContent = processingText || 'Processing...';
+                } else {
+                    button.textContent = processingText || 'Processing...';
+                }
             }
             if (processingSection) {
                 processingSection.style.display = 'flex';
@@ -480,7 +486,11 @@ function setProcessingState(processing, button, processingSection, originalText,
         } else {
             if (button) {
                 button.disabled = false;
-                button.textContent = originalText || 'Process';
+                if (labelElement) {
+                    labelElement.textContent = originalText || 'Process';
+                } else {
+                    button.textContent = originalText || 'Process';
+                }
             }
             if (processingSection) {
                 processingSection.style.display = 'none';

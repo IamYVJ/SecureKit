@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
     default-src 'self'; 
-    script-src 'self' https://cdn.jsdelivr.net; 
+    script-src 'self' https://cdnjs.cloudflare.com; 
     style-src 'self' 'unsafe-inline'; 
     img-src 'self' data: blob:; 
     font-src 'self'; 
@@ -16,9 +16,6 @@
     frame-ancestors 'none';
 ">
     <title>SecureKit — Privacy-First PDF Toolkit</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,7 +30,7 @@
                 <li><a href="merge.html">Merge</a></li>
                 <li><a href="split.html">Split</a></li>
                 <li><a href="compress.html">Compress</a></li>
-                <li><a href="#secure">Secure</a></li>
+                <li><a href="secure.html">Secure</a></li>
                 <li><a href="#pdf-to-image">PDF to Image</a></li>
                 <li><a href="#image-to-pdf">Image to PDF</a></li>
                 <li><a href="#about">About</a></li>
@@ -100,8 +97,8 @@
         <section id="tools" class="tools-section">
             <div class="container">
                 <div class="section-header">
-                    <h2 class="section-title">Complete PDF Toolkit</h2>
-                    <p class="section-description">Six essential tools. All processing in your browser.</p>
+                    <h2 class="section-title">PDF Toolkit</h2>
+                    <p class="section-description">Four live tools today, with two more in progress. All processing stays in your browser.</p>
                 </div>
 
                 <div class="tools-grid">
@@ -153,7 +150,7 @@
                             </div>
                             <h3>Compress PDF</h3>
                         </div>
-                        <p class="tool-description">Reduce file size while preserving document quality</p>
+                        <p class="tool-description">Optimize PDF size with structural and image-based compression</p>
                         <a href="compress.html" class="tool-button">
                             <span>Start Compressing</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -173,12 +170,12 @@
                             <h3>Secure PDF</h3>
                         </div>
                         <p class="tool-description">Add password protection to safeguard your documents</p>
-                        <button class="tool-button">
-                            <span>Add Protection</span>
+                        <a href="secure.html" class="tool-button">
+                            <span>Start Securing</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                        </button>
+                        </a>
                     </article>
 
                     <article id="pdf-to-image" class="tool-card">
@@ -193,12 +190,9 @@
                             <h3>PDF to Image</h3>
                         </div>
                         <p class="tool-description">Convert PDF pages to high-quality JPG or PNG images</p>
-                        <button class="tool-button">
-                            <span>Convert to Image</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
+                        <span class="tool-button tool-button-disabled" aria-disabled="true">
+                            <span>Coming Soon</span>
+                        </span>
                     </article>
 
                     <article id="image-to-pdf" class="tool-card">
@@ -212,12 +206,9 @@
                             <h3>Image to PDF</h3>
                         </div>
                         <p class="tool-description">Create professional PDF documents from your images</p>
-                        <button class="tool-button">
-                            <span>Convert to PDF</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
+                        <span class="tool-button tool-button-disabled" aria-disabled="true">
+                            <span>Coming Soon</span>
+                        </span>
                     </article>
                 </div>
             </div>
@@ -235,7 +226,7 @@
                         <div class="about-number">01</div>
                         <h3>Complete Privacy</h3>
                         <p>
-                            Every operation happens locally in your browser using WebAssembly and modern JavaScript APIs. 
+                            Every operation happens locally in your browser using modern JavaScript APIs. 
                             Your files are never uploaded to any server—there are no servers to begin with.
                         </p>
                     </div>
@@ -272,7 +263,7 @@
                     <div class="tech-content">
                         <h3>How It Works</h3>
                         <p>
-                            SecureKit leverages cutting-edge web technologies like PDF-lib, PDF.js, and the Canvas API 
+                            SecureKit uses PDF-lib together with browser file and blob APIs
                             to process PDFs entirely within your browser. When you select a file, it's loaded into 
                             browser memory, manipulated using JavaScript, and the output is generated directly on your 
                             device. No network requests occur during processing—your data remains completely private 

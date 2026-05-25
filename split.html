@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
     default-src 'self'; 
-    script-src 'self' https://cdn.jsdelivr.net; 
+    script-src 'self' https://cdnjs.cloudflare.com; 
     style-src 'self' 'unsafe-inline'; 
     img-src 'self' data: blob:; 
     font-src 'self'; 
@@ -16,11 +16,6 @@
     frame-ancestors 'none';
 ">
     <title>Split PDF - SecureKit</title>
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
@@ -40,10 +35,10 @@
             <ul class="nav-links">
                 <li><a href="merge.html">Merge</a></li>
                 <li><a href="split.html">Split</a></li>
-                <li><a href="#compress">Compress</a></li>
-                <li><a href="#secure">Secure</a></li>
-                <li><a href="#pdf-to-image">PDF to Image</a></li>
-                <li><a href="#image-to-pdf">Image to PDF</a></li>
+                <li><a href="compress.html">Compress</a></li>
+                <li><a href="secure.html">Secure</a></li>
+                <li><a href="index.html#pdf-to-image">PDF to Image</a></li>
+                <li><a href="index.html#image-to-pdf">Image to PDF</a></li>
                 <li><a href="index.html#about">About</a></li>
             </ul>
         </nav>
@@ -206,8 +201,41 @@
             <div class="processing-section" id="processingSection" style="display: none;">
                 <div class="processing-card">
                     <div class="spinner"></div>
-                    <h3>Splitting PDF...</h3>
-                    <p>Please wait while we process your file</p>
+                    <h3 id="processingTitle">Splitting PDF...</h3>
+                    <p id="processingMessage">Please wait while we process your file</p>
+                    <div class="progress-info" id="progressInfo" style="display: none;">
+                        <div class="progress-text">Creating split <span id="currentFile">1</span> of <span id="totalFiles">1</span></div>
+                        <div class="processing-stats" id="processingStats"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="completion-section" id="completionSection" style="display: none;">
+                <div class="completion-card">
+                    <div class="completion-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                            <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3 id="completionTitle">Split Files Ready</h3>
+                    <p id="completionSummary">Your split files are ready to save.</p>
+                    <div class="completion-stats-grid" id="completionStats"></div>
+                    <div class="completion-details" id="completionDetails"></div>
+                    <div class="completion-actions">
+                        <button class="primary-button" id="saveButton">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>Save Files</span>
+                        </button>
+                        <button class="secondary-button" id="anotherButton">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <span>Split Another</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

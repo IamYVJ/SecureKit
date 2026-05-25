@@ -10,6 +10,9 @@ const { PDFDocument } = PDFLib;
 let selectedFiles = [];
 let draggedElement = null;
 let isProcessing = false;
+let workflowStage = 'setup';
+let lastMergeResult = null;
+const PENDING_COMPRESS_STORAGE_KEY = 'securekit.pendingCompressFile';
 
 // DOM Elements
 const uploadArea = document.getElementById('uploadArea');
@@ -23,6 +26,21 @@ const addMoreButton = document.getElementById('addMoreButton');
 const clearButton = document.getElementById('clearButton');
 const mergeButton = document.getElementById('mergeButton');
 const processingSection = document.getElementById('processingSection');
+const processingTitle = document.getElementById('processingTitle');
+const processingMessage = document.getElementById('processingMessage');
+const progressInfo = document.getElementById('progressInfo');
+const currentFile = document.getElementById('currentFile');
+const totalFiles = document.getElementById('totalFiles');
+const processingStats = document.getElementById('processingStats');
+const completionSection = document.getElementById('completionSection');
+const completionTitle = document.getElementById('completionTitle');
+const completionSummary = document.getElementById('completionSummary');
+const completionStats = document.getElementById('completionStats');
+const completionDetails = document.getElementById('completionDetails');
+const saveButton = document.getElementById('saveButton');
+const compressMergedButton = document.getElementById('compressMergedButton');
+const anotherButton = document.getElementById('anotherButton');
+const infoSection = document.querySelector('.info-section');
 const enablePageSelection = document.getElementById('enablePageSelection');
 const outputFilename = document.getElementById('outputFilename');
 const accordionToggle = document.getElementById('accordionToggle');
@@ -58,7 +76,7 @@ try {
 
     uploadArea?.addEventListener('click', (e) => {
         try {
-            if (e.target !== browseButton) {
+            if (!browseButton?.contains(e.target)) {
                 fileInput.click();
             }
         } catch (error) {
@@ -78,6 +96,9 @@ try {
 
     clearButton?.addEventListener('click', clearAllFiles);
     mergeButton?.addEventListener('click', mergePDFs);
+    saveButton?.addEventListener('click', saveMergedResult);
+    compressMergedButton?.addEventListener('click', compressMergedResult);
+    anotherButton?.addEventListener('click', startAnotherMerge);
 
     enablePageSelection?.addEventListener('change', (e) => {
         try {
@@ -257,6 +278,34 @@ async function addFiles(files) {
 
 function updateUI() {
     try {
+        if (workflowStage === 'processing') {
+            uploadSection.style.display = 'none';
+            filesSection.style.display = 'none';
+            processingSection.style.display = 'flex';
+            completionSection.style.display = 'none';
+            if (infoSection) {
+                infoSection.style.display = 'none';
+            }
+            return;
+        }
+
+        if (workflowStage === 'completed') {
+            uploadSection.style.display = 'none';
+            filesSection.style.display = 'none';
+            processingSection.style.display = 'none';
+            completionSection.style.display = 'block';
+            if (infoSection) {
+                infoSection.style.display = 'none';
+            }
+            return;
+        }
+
+        processingSection.style.display = 'none';
+        completionSection.style.display = 'none';
+        if (infoSection) {
+            infoSection.style.display = 'block';
+        }
+
         if (selectedFiles.length > 0) {
             uploadSection.style.display = 'none';
             filesSection.style.display = 'block';
@@ -271,6 +320,194 @@ function updateUI() {
         console.error('Error updating UI:', error);
         showErrorMessage('UI update failed. Please refresh the page.');
     }
+}
+
+function setWorkflowStage(stage) {
+    workflowStage = stage;
+    updateUI();
+
+    if (stage === 'processing') {
+        processingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (stage === 'completed') {
+        completionSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function updateProgress(fileIndex, totalCount, message, stats = '') {
+    if (processingTitle) {
+        processingTitle.textContent = `Merging ${fileIndex} of ${totalCount}`;
+    }
+
+    if (processingMessage) {
+        processingMessage.textContent = message;
+    }
+
+    if (currentFile) {
+        currentFile.textContent = String(fileIndex);
+    }
+
+    if (totalFiles) {
+        totalFiles.textContent = String(totalCount);
+    }
+
+    if (processingStats) {
+        processingStats.textContent = stats;
+    }
+
+    if (progressInfo) {
+        progressInfo.style.display = 'block';
+    }
+}
+
+function resetProgress() {
+    if (processingTitle) {
+        processingTitle.textContent = 'Merging PDFs...';
+    }
+
+    if (processingMessage) {
+        processingMessage.textContent = 'Please wait while we combine your files';
+    }
+
+    if (processingStats) {
+        processingStats.textContent = '';
+    }
+
+    if (progressInfo) {
+        progressInfo.style.display = 'none';
+    }
+}
+
+function renderCompletionStats(items) {
+    if (!completionStats) {
+        return;
+    }
+
+    completionStats.innerHTML = items.map((item) => `
+        <div class="completion-stat">
+            <span class="completion-stat-label">${escapeHtml(item.label)}</span>
+            <span class="completion-stat-value">${escapeHtml(item.value)}</span>
+        </div>
+    `).join('');
+}
+
+function renderCompletionDetails(notes, items) {
+    if (!completionDetails) {
+        return;
+    }
+
+    const noteMarkup = notes.map((note) => `
+        <div class="completion-note">${note}</div>
+    `).join('');
+
+    const listMarkup = items.length > 0 ? `
+        <div class="completion-list">
+            ${items.map((item) => `
+                <div class="completion-list-item">
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <span>${escapeHtml(item.meta)}</span>
+                </div>
+            `).join('')}
+        </div>
+    ` : '';
+
+    completionDetails.innerHTML = noteMarkup + listMarkup;
+}
+
+function showMergeCompletion(result) {
+    lastMergeResult = result;
+
+    if (completionTitle) {
+        completionTitle.textContent = 'Merged PDF Ready';
+    }
+
+    if (completionSummary) {
+        completionSummary.textContent = `Combined ${result.successCount} of ${result.totalInputFiles} selected files into ${result.pageCount} pages.`;
+    }
+
+    renderCompletionStats([
+        { label: 'Output File', value: `${result.filename}.pdf` },
+        { label: 'Merged Pages', value: String(result.pageCount) },
+        { label: 'Files Included', value: `${result.successCount} of ${result.totalInputFiles}` },
+        { label: 'Output Size', value: formatFileSize(result.bytes.length) }
+    ]);
+
+    const notes = [
+        `<strong>Done:</strong> Your PDFs were merged into a single file named <strong>${escapeHtml(result.filename)}.pdf</strong>.`
+    ];
+
+    if (result.failedFiles.length > 0) {
+        notes.push(`<strong>Attention:</strong> ${result.failedFiles.length} file${result.failedFiles.length !== 1 ? 's were' : ' was'} skipped during merge.`);
+    }
+
+    renderCompletionDetails(
+        notes,
+        [
+            ...result.sourceFiles.map((file) => ({
+                title: file.name,
+                meta: `${file.pages} page${file.pages !== 1 ? 's' : ''}`
+            })),
+            ...result.failedFiles.map((file) => ({
+                title: `${file.name} (skipped)`,
+                meta: file.error
+            }))
+        ]
+    );
+
+    setWorkflowStage('completed');
+}
+
+async function saveMergedResult() {
+    if (!lastMergeResult) {
+        showWarningMessage('No merged file is ready to save yet.');
+        return;
+    }
+
+    try {
+        await downloadPDF(lastMergeResult.bytes, lastMergeResult.filename);
+    } catch (error) {
+        console.error('Error saving merged file:', error);
+        showErrorMessage(error.message || 'Failed to save the merged PDF.');
+    }
+}
+
+function uint8ArrayToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk);
+    }
+
+    return btoa(binary);
+}
+
+function compressMergedResult() {
+    if (!lastMergeResult) {
+        showWarningMessage('No merged file is ready to compress yet.');
+        return;
+    }
+
+    try {
+        const payload = {
+            filename: `${lastMergeResult.filename}.pdf`,
+            mimeType: 'application/pdf',
+            bytesBase64: uint8ArrayToBase64(lastMergeResult.bytes)
+        };
+
+        sessionStorage.setItem(PENDING_COMPRESS_STORAGE_KEY, JSON.stringify(payload));
+        window.location.href = 'compress.html';
+    } catch (error) {
+        console.error('Error preparing merged file for compression:', error);
+        showErrorMessage('Unable to open the merged file in the compression tool. Save it first, then upload it on the Compress page.');
+    }
+}
+
+function startAnotherMerge() {
+    lastMergeResult = null;
+    clearAllFiles();
+    outputFilename.value = getDefaultFilename('MergedPDF');
+    setWorkflowStage('setup');
 }
 
 function renderFilesList() {
@@ -352,12 +589,104 @@ function renderFilesList() {
     }
 }
 
+function renderFilesList() {
+    try {
+        if (!filesList) {
+            console.error('Files list element not found');
+            return;
+        }
+
+        filesList.innerHTML = '';
+
+        selectedFiles.forEach((fileData, index) => {
+            try {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.draggable = true;
+                fileItem.dataset.index = index;
+
+                const pageInputHtml = `
+                    <div class="page-selection-wrapper ${enablePageSelection?.checked ? 'active' : ''}">
+                        <label class="page-selection-label" for="pageSelection_${index}">Pages to include</label>
+                        <div class="page-selection-field">
+                            <input type="text"
+                                   class="page-selection-input"
+                                   id="pageSelection_${index}"
+                                   placeholder="e.g., 1,3,5-7"
+                                   value="${fileData.pageSelection || ''}"
+                                   data-index="${index}">
+                            <span class="page-hint">Leave empty for all pages</span>
+                        </div>
+                    </div>
+                `;
+
+                fileItem.innerHTML = `
+                    <div class="drag-handle">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
+                            <circle cx="12" cy="4" r="1.5" fill="currentColor"/>
+                            <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
+                            <circle cx="12" cy="8" r="1.5" fill="currentColor"/>
+                            <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-header-row">
+                            <div class="file-meta">
+                                <div class="file-name">${escapeHtml(fileData.name)}</div>
+                                <div class="file-details">
+                                    ${fileData.size} - ${fileData.pageCount} page${fileData.pageCount !== 1 ? 's' : ''}
+                                </div>
+                            </div>
+                            <button class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(fileData.name)}">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        ${pageInputHtml}
+                    </div>
+                `;
+
+                fileItem.addEventListener('dragstart', handleDragStart);
+                fileItem.addEventListener('dragover', handleDragOver);
+                fileItem.addEventListener('drop', handleDrop);
+                fileItem.addEventListener('dragend', handleDragEnd);
+
+                const removeBtn = fileItem.querySelector('.remove-file');
+                removeBtn?.addEventListener('click', () => removeFile(index));
+
+                const pageInput = fileItem.querySelector('.page-selection-input');
+                pageInput?.addEventListener('input', (e) => {
+                    selectedFiles[index].pageSelection = e.target.value;
+                });
+
+                filesList.appendChild(fileItem);
+            } catch (error) {
+                console.error('Error rendering file item:', fileData.name, error);
+            }
+        });
+    } catch (error) {
+        console.error('Error in renderFilesList:', error);
+    }
+}
+
 function updateSizeDisplay() {
     try {
         const totalSize = selectedFiles.reduce((sum, file) => sum + file.sizeBytes, 0);
         const totalSizeElement = document.getElementById('totalSize');
         if (totalSizeElement) {
             totalSizeElement.textContent = formatFileSize(totalSize);
+
+            totalSizeElement.classList.remove('size-warning', 'size-danger');
+
+            if (totalSize > FILE_SIZE_CONFIG.MAX_TOTAL_MERGE) {
+                totalSizeElement.classList.add('size-danger');
+            } else if (totalSize > FILE_SIZE_CONFIG.MAX_TOTAL_MERGE * 0.8) {
+                totalSizeElement.classList.add('size-warning');
+            }
         }
     } catch (error) {
         console.error('Error updating size display:', error);
@@ -383,6 +712,7 @@ function removeFile(index) {
 function clearAllFiles() {
     try {
         selectedFiles = [];
+        lastMergeResult = null;
         updateUI();
 
         if (enablePageSelection) {
@@ -399,9 +729,10 @@ function clearAllFiles() {
 // ============================================
 
 function handleDragStart(e) {
-    draggedElement = e.target;
-    e.target.style.opacity = '0.5';
+    draggedElement = e.currentTarget;
+    e.currentTarget.style.opacity = '0.5';
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.index || '');
 }
 
 function handleDragOver(e) {
@@ -436,7 +767,7 @@ function handleDrop(e) {
 }
 
 function handleDragEnd(e) {
-    e.target.style.opacity = '1';
+    e.currentTarget.style.opacity = '1';
 
     document.querySelectorAll('.file-item').forEach(item => {
         item.classList.remove('drag-over');
@@ -465,15 +796,24 @@ async function mergePDFs() {
         }
 
         isProcessing = true;
-        setProcessingState(true, mergeButton, processingSection, 'Merge PDFs', 'Merging...');
+        setProcessingState(true, mergeButton, null, 'Merge PDFs', 'Merging...');
+        resetProgress();
+        setWorkflowStage('processing');
 
         const mergedPdf = await PDFDocument.create();
         let successCount = 0;
         let failedFiles = [];
+        const mergedSourceFiles = [];
 
         for (let i = 0; i < selectedFiles.length; i++) {
             try {
                 const fileData = selectedFiles[i];
+                updateProgress(
+                    i + 1,
+                    selectedFiles.length,
+                    `Preparing ${fileData.name}`,
+                    `${fileData.pageCount} page${fileData.pageCount !== 1 ? 's' : ''}`
+                );
                 const arrayBuffer = await fileData.file.arrayBuffer();
 
                 if (!arrayBuffer || arrayBuffer.byteLength === 0) {
@@ -511,6 +851,10 @@ async function mergePDFs() {
                 copiedPages.forEach(page => mergedPdf.addPage(page));
 
                 successCount++;
+                mergedSourceFiles.push({
+                    name: fileData.name,
+                    pages: pagesToCopy.length
+                });
             } catch (error) {
                 console.error('Error processing file:', selectedFiles[i].name, error);
                 let errorMsg = 'Failed to process';
@@ -541,25 +885,24 @@ async function mergePDFs() {
         }
 
         const filename = outputFilename.value.trim() || 'MergedPDF';
-        await downloadPDF(pdfBytes, filename);
-
-        let successMsg = `Successfully merged ${successCount} out of ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}.`;
-
-        if (failedFiles.length > 0) {
-            successMsg += '\n\nFailed files:\n' + failedFiles.map(f => `• ${f.name}: ${f.error}`).join('\n');
-            showWarningMessage(successMsg);
-        } else {
-            showSuccessMessage(successMsg);
-        }
-
-        clearAllFiles();
+        showMergeCompletion({
+            bytes: pdfBytes,
+            filename,
+            pageCount: mergedPageCount,
+            successCount,
+            totalInputFiles: selectedFiles.length,
+            failedFiles,
+            sourceFiles: mergedSourceFiles
+        });
 
     } catch (error) {
         console.error('Error merging PDFs:', error);
         showErrorMessage(error.message || 'An error occurred while merging PDFs. Please try again.');
+        setWorkflowStage('setup');
     } finally {
         isProcessing = false;
-        setProcessingState(false, mergeButton, processingSection, 'Merge PDFs', 'Merging...');
+        setProcessingState(false, mergeButton, null, 'Merge PDFs', 'Merging...');
+        resetProgress();
     }
 }
 
@@ -571,7 +914,9 @@ window.addEventListener('error', (event) => {
     console.error('Global error:', event.error);
     if (isProcessing) {
         isProcessing = false;
-        setProcessingState(false, mergeButton, processingSection, 'Merge PDFs', 'Merging...');
+        setProcessingState(false, mergeButton, null, 'Merge PDFs', 'Merging...');
+        resetProgress();
+        setWorkflowStage('setup');
         showErrorMessage('An unexpected error occurred. Please try again.');
     }
 });
@@ -580,7 +925,9 @@ window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
     if (isProcessing) {
         isProcessing = false;
-        setProcessingState(false, mergeButton, processingSection, 'Merge PDFs', 'Merging...');
+        setProcessingState(false, mergeButton, null, 'Merge PDFs', 'Merging...');
+        resetProgress();
+        setWorkflowStage('setup');
         showErrorMessage('An unexpected error occurred. Please try again.');
     }
 });

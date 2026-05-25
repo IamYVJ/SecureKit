@@ -242,7 +242,7 @@ function validateFileSize(file, showWarning = true) {
         }
 
         // Security: Validate MIME type (whitelist)
-        if (!hasValidMimeType(file.type)) {
+        if (file.type && !hasValidMimeType(file.type)) {
             return {
                 valid: false,
                 error: `Invalid MIME type "${escapeHtml(file.type)}". Expected application/pdf.`,
@@ -715,7 +715,7 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
         iconSvg.appendChild(path2);
 
         const messageSpan = createSafeElement('span', message);
-        messageSpan.style.cssText = 'flex: 1;';
+        messageSpan.style.cssText = 'white-space: pre-line; flex: 1;';
 
         warningDiv.appendChild(iconSvg);
         warningDiv.appendChild(messageSpan);
@@ -810,6 +810,7 @@ function showSuccessMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
         iconSvg.appendChild(path);
 
         const messageSpan = createSafeElement('span', message);
+        messageSpan.style.cssText = 'white-space: pre-line; flex: 1;';
 
         successDiv.appendChild(iconSvg);
         successDiv.appendChild(messageSpan);
@@ -852,14 +853,7 @@ function checkBrowserCompatibility() {
             'ArrayBuffer': typeof ArrayBuffer !== 'undefined',
             'Blob': typeof Blob !== 'undefined',
             'Promise': typeof Promise !== 'undefined',
-            'Async/Await': (function() {
-                try {
-                    eval('(async () => {})');
-                    return true;
-                } catch (e) {
-                    return false;
-                }
-            })()
+            'URL API': typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
         };
 
         const missingFeatures = [];
