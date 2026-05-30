@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;
+    script-src 'self';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob:;
     font-src 'self';
-    connect-src 'self' https://cdn.jsdelivr.net;
+    connect-src 'self';
     object-src 'none';
     base-uri 'self';
     form-action 'self';
@@ -34,8 +34,8 @@
                 <li><a href="split.html">Split</a></li>
                 <li><a href="compress.html">Compress</a></li>
                 <li><a href="secure.html">Secure</a></li>
-                <li><a href="index.html#pdf-to-image">PDF to Image</a></li>
-                <li><a href="index.html#image-to-pdf">Image to PDF</a></li>
+                <li><a href="pdf-to-image.html">PDF to Image</a></li>
+                <li><a href="image-to-pdf.html">Image to PDF</a></li>
                 <li><a href="index.html#about">About</a></li>
             </ul>
         </nav>
@@ -288,9 +288,10 @@
         </div>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
     <script src="shared-utils.js"></script>
     <script src="file-size-validation.js"></script>
     <script src="secure.js"></script>
+    <script src="sw-register.js"></script>
 </body>
 </html>

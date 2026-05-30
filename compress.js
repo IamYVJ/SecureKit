@@ -3,7 +3,7 @@
 // SecureKit - Client-Side PDF Processing
 // ============================================
 
-const { PDFDocument } = PDFLib;
+const { PDFDocument, PDFName, PDFArray, PDFRawStream, PDFNumber } = PDFLib;
 
 const STRUCTURAL_PRESETS = {
     low: { objectsPerTick: 50, useObjectStreams: true },
@@ -16,6 +16,22 @@ const IMAGE_PRESETS = {
     medium: { renderScale: 1.1, jpegQuality: 0.66, label: 'image-based (medium)' },
     high: { renderScale: 0.85, jpegQuality: 0.48, label: 'image-based (high)' }
 };
+
+// Non-destructive image recompression: re-encodes embedded JPEG XObjects only.
+// Preserves text, vector content, forms, links, metadata.
+const SMART_RECOMPRESS_PRESETS = {
+    low:    [{ jpegQuality: 0.85, maxDimension: null, label: 'smart-recompress (low)' }],
+    medium: [{ jpegQuality: 0.70, maxDimension: 2400, label: 'smart-recompress (medium)' }],
+    high:   [{ jpegQuality: 0.50, maxDimension: 1600, label: 'smart-recompress (high)' }]
+};
+
+const SMART_RECOMPRESS_CUSTOM_ATTEMPTS = [
+    { jpegQuality: 0.85, maxDimension: null, label: 'smart-recompress 1' },
+    { jpegQuality: 0.75, maxDimension: 2400, label: 'smart-recompress 2' },
+    { jpegQuality: 0.65, maxDimension: 2000, label: 'smart-recompress 3' },
+    { jpegQuality: 0.55, maxDimension: 1600, label: 'smart-recompress 4' },
+    { jpegQuality: 0.45, maxDimension: 1200, label: 'smart-recompress 5' }
+];
 
 const MAX_RENDER_PIXELS = 8_000_000;
 
@@ -52,7 +68,7 @@ const completionDetails = document.getElementById('completionDetails');
 const saveButton = document.getElementById('saveButton');
 const anotherButton = document.getElementById('anotherButton');
 const infoSection = document.querySelector('.info-section');
-const PDF_JS_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDF_JS_WORKER_URL = 'lib/pdf.worker.min.js';
 
 try {
     if (typeof pdfjsLib === 'undefined') {
@@ -200,60 +216,42 @@ function addFiles(files) {
     }
 }
 
-function updateUI() {
-    try {
-        if (workflowStage === 'processing') {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'none';
-            processingSection.style.display = 'flex';
-            completionSection.style.display = 'none';
-            if (infoSection) {
-                infoSection.style.display = 'none';
-            }
-            return;
-        }
+const sections = {
+    upload: uploadSection,
+    files: filesSection,
+    processing: processingSection,
+    completion: completionSection,
+    info: infoSection
+};
 
-        if (workflowStage === 'completed') {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'none';
-            processingSection.style.display = 'none';
-            completionSection.style.display = 'block';
-            if (infoSection) {
-                infoSection.style.display = 'none';
-            }
-            return;
-        }
+const progressElements = {
+    titleEl: processingTitle,
+    messageEl: processingMessage,
+    statsEl: compressionStats,
+    currentEl: currentFile,
+    totalEl: totalFiles,
+    infoEl: progressInfo
+};
 
-        processingSection.style.display = 'none';
-        completionSection.style.display = 'none';
-        if (infoSection) {
-            infoSection.style.display = 'block';
-        }
-
-        if (selectedFiles.length > 0) {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'block';
-            renderFilesList();
-            fileCount.textContent = selectedFiles.length;
-        } else {
-            uploadSection.style.display = 'block';
-            filesSection.style.display = 'none';
-        }
-    } catch (error) {
-        console.error('Error updating UI:', error);
-        showErrorMessage('UI update failed. Please refresh the page.');
+function setupHandler() {
+    if (selectedFiles.length > 0) {
+        uploadSection.style.display = 'none';
+        filesSection.style.display = 'block';
+        renderFilesList();
+        fileCount.textContent = selectedFiles.length;
+    } else {
+        uploadSection.style.display = 'block';
+        filesSection.style.display = 'none';
     }
+}
+
+function updateUI() {
+    applyWorkflowStage(workflowStage, sections, { setupHandler });
 }
 
 function setWorkflowStage(stage) {
     workflowStage = stage;
-    updateUI();
-
-    if (stage === 'processing') {
-        processingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (stage === 'completed') {
-        completionSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    applyWorkflowStage(stage, sections, { setupHandler, scrollOnTransition: true });
 }
 
 function renderFilesList() {
@@ -324,43 +322,14 @@ function clearAllFiles() {
 }
 
 function updateProgress(fileIndex, totalCount, message, stats = '') {
-    if (currentFile) {
-        currentFile.textContent = String(fileIndex);
-    }
-
-    if (totalFiles) {
-        totalFiles.textContent = String(totalCount);
-    }
-
-    if (processingMessage) {
-        processingMessage.textContent = message;
-    }
-
-    if (compressionStats) {
-        compressionStats.textContent = stats;
-    }
-
-    if (progressInfo) {
-        progressInfo.style.display = 'block';
-    }
+    updateProgressUI(progressElements, fileIndex, totalCount, message, stats);
 }
 
 function resetProgress() {
-    if (processingTitle) {
-        processingTitle.textContent = 'Compressing PDFs...';
-    }
-
-    if (processingMessage) {
-        processingMessage.textContent = 'Please wait while we evaluate the best compression path for your files';
-    }
-
-    if (compressionStats) {
-        compressionStats.textContent = '';
-    }
-
-    if (progressInfo) {
-        progressInfo.style.display = 'none';
-    }
+    resetProgressUI(progressElements, {
+        title: 'Compressing PDFs...',
+        message: 'Please wait while we evaluate the best compression path for your files'
+    });
 }
 
 function renderCompletionStats(items) {
@@ -418,8 +387,14 @@ function showCompressionCompletion(result) {
         '<strong>Done:</strong> Your compression results are ready to save.'
     ];
 
+    if (result.smartRecompressedCount > 0) {
+        const fileWord = result.smartRecompressedCount !== 1 ? 's' : '';
+        const imgWord = result.totalImagesRecompressed !== 1 ? 'images' : 'image';
+        notes.push(`<strong>Smart recompression:</strong> Re-encoded ${result.totalImagesRecompressed} ${imgWord} across ${result.smartRecompressedCount} file${fileWord}. Text, vectors, forms, and links were preserved.`);
+    }
+
     if (result.flattenedCount > 0) {
-        notes.push(`<strong>Heads up:</strong> ${result.flattenedCount} file${result.flattenedCount !== 1 ? 's were' : ' was'} flattened into images to reduce size.`);
+        notes.push(`<strong>Heads up:</strong> ${result.flattenedCount} file${result.flattenedCount !== 1 ? 's were' : ' was'} flattened into images to reach a smaller size. Searchable text, links, and form fields may not survive in those files.`);
     }
 
     if (result.targetMisses > 0) {
@@ -475,6 +450,164 @@ function startAnotherCompression() {
     lastCompressionResult = null;
     clearAllFiles();
     setWorkflowStage('setup');
+}
+
+async function tryRecompressJpegStream(rawStream, jpegQuality, maxDimension) {
+    const dict = rawStream.dict;
+
+    const filter = dict.get(PDFName.of('Filter'));
+    let filterName = null;
+    if (!filter) {
+        return null;
+    } else if (filter instanceof PDFArray) {
+        if (filter.size() !== 1) {
+            return null;
+        }
+        filterName = filter.get(0)?.encodedName;
+    } else {
+        filterName = filter.encodedName;
+    }
+    if (filterName !== '/DCTDecode') {
+        return null;
+    }
+
+    // Skip masked images: downscaling would desync the mask's coordinate space.
+    if (dict.get(PDFName.of('SMask')) || dict.get(PDFName.of('Mask'))) {
+        return null;
+    }
+
+    // Canvas re-encoding produces RGB. Skip color spaces we can't faithfully round-trip
+    // (CMYK, ICCBased, Indexed, etc.).
+    const colorSpace = dict.get(PDFName.of('ColorSpace'));
+    if (colorSpace instanceof PDFArray) {
+        return null;
+    }
+    const csName = colorSpace?.encodedName ?? null;
+    if (csName && csName !== '/DeviceRGB' && csName !== '/DeviceGray') {
+        return null;
+    }
+
+    const originalBytes = rawStream.contents;
+    const originalSize = originalBytes?.length ?? 0;
+    if (originalSize === 0) {
+        return null;
+    }
+
+    let bitmap;
+    try {
+        const blob = new Blob([originalBytes], { type: 'image/jpeg' });
+        bitmap = await createImageBitmap(blob);
+    } catch (e) {
+        return null;
+    }
+
+    let width = bitmap.width;
+    let height = bitmap.height;
+    if (maxDimension && Math.max(width, height) > maxDimension) {
+        const scale = maxDimension / Math.max(width, height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) {
+        bitmap.close?.();
+        return null;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+
+    const newBlob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', jpegQuality)
+    );
+    canvas.width = 0;
+    canvas.height = 0;
+
+    if (!newBlob) {
+        return null;
+    }
+
+    const newBytes = new Uint8Array(await newBlob.arrayBuffer());
+    if (newBytes.length >= originalSize) {
+        return null;
+    }
+
+    const newDict = dict.clone();
+    newDict.set(PDFName.of('Width'), PDFNumber.of(width));
+    newDict.set(PDFName.of('Height'), PDFNumber.of(height));
+    newDict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+    newDict.set(PDFName.of('BitsPerComponent'), PDFNumber.of(8));
+    newDict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+    newDict.delete(PDFName.of('DecodeParms'));
+    newDict.delete(PDFName.of('Decode'));
+
+    const newStream = PDFRawStream.of(newDict, newBytes);
+    return { newStream, originalSize, newSize: newBytes.length };
+}
+
+async function recompressEmbeddedImages(arrayBuffer, options, fileIndex, totalCount, attemptLabel = '') {
+    const { jpegQuality, maxDimension } = options;
+    const pdfDoc = await PDFDocument.load(arrayBuffer.slice(0));
+    const context = pdfDoc.context;
+
+    const imageStreams = [];
+    for (const [ref, obj] of context.enumerateIndirectObjects()) {
+        if (!(obj instanceof PDFRawStream)) continue;
+        const subtype = obj.dict.get(PDFName.of('Subtype'));
+        if (subtype?.encodedName === '/Image') {
+            imageStreams.push([ref, obj]);
+        }
+    }
+
+    if (imageStreams.length === 0) {
+        return null;
+    }
+
+    let recompressed = 0;
+    let savedBytes = 0;
+
+    for (let i = 0; i < imageStreams.length; i++) {
+        const [ref, obj] = imageStreams[i];
+
+        updateProgress(
+            fileIndex,
+            totalCount,
+            `Recompressing image ${i + 1} of ${imageStreams.length}${attemptLabel ? ` (${attemptLabel})` : ''}`,
+            `JPEG quality ${Math.round(jpegQuality * 100)}%${maxDimension ? `, max ${maxDimension}px` : ', no resize'}`
+        );
+
+        try {
+            const result = await tryRecompressJpegStream(obj, jpegQuality, maxDimension);
+            if (result) {
+                context.assign(ref, result.newStream);
+                recompressed++;
+                savedBytes += result.originalSize - result.newSize;
+            }
+        } catch (e) {
+            console.warn('Image recompress skipped:', e.message);
+        }
+
+        if ((i & 3) === 3) {
+            await new Promise((r) => setTimeout(r, 0));
+        }
+    }
+
+    if (recompressed === 0) {
+        return null;
+    }
+
+    const bytes = await pdfDoc.save({ useObjectStreams: true, objectsPerTick: 20 });
+    return {
+        bytes,
+        recompressedImages: recompressed,
+        totalImages: imageStreams.length,
+        savedBytes
+    };
 }
 
 async function optimizeStructurally(arrayBuffer, compressionLevel) {
@@ -737,6 +870,58 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
         console.warn('Structural optimization failed for', fileData.name, error);
     }
 
+    const smartAttempts = compressionLevel === 'custom'
+        ? SMART_RECOMPRESS_CUSTOM_ATTEMPTS
+        : (SMART_RECOMPRESS_PRESETS[compressionLevel] || SMART_RECOMPRESS_PRESETS.medium);
+
+    for (const smart of smartAttempts) {
+        try {
+            updateProgress(
+                fileIndex,
+                totalCount,
+                'Smart image recompression: scanning for JPEG XObjects...',
+                `Preserving text, vectors, forms, and metadata`
+            );
+
+            const smartResult = await recompressEmbeddedImages(
+                arrayBuffer,
+                smart,
+                fileIndex,
+                totalCount,
+                smart.label
+            );
+
+            if (!smartResult || !smartResult.bytes || smartResult.bytes.length === 0) {
+                break;
+            }
+
+            const candidate = {
+                bytes: smartResult.bytes,
+                method: smart.label,
+                flattened: false,
+                recompressed: true,
+                recompressedImages: smartResult.recompressedImages,
+                totalImages: smartResult.totalImages,
+                qualityScore: Number.MAX_SAFE_INTEGER,
+                targetMet: targetSizeBytes ? smartResult.bytes.length <= targetSizeBytes : true
+            };
+
+            bestResult = chooseSmallerResult(bestResult, candidate);
+            bestTargetResult = chooseBestTargetResult(bestTargetResult, candidate);
+
+            if (isTargetMode && bestTargetResult && !bestTargetResult.flattened && bestTargetResult.targetMet) {
+                return bestTargetResult;
+            }
+
+            if (!isTargetMode && targetSizeBytes && candidate.targetMet) {
+                return candidate;
+            }
+        } catch (error) {
+            console.warn('Smart image recompression failed for', fileData.name, error);
+            break;
+        }
+    }
+
     const imageAttempts = compressionLevel === 'custom'
         ? buildCustomImageAttempts()
         : buildPresetImageAttempts(compressionLevel);
@@ -865,6 +1050,8 @@ async function compressPDFs() {
         const successfulCompressions = [];
         const failedCompressions = [];
         let flattenedCount = 0;
+        let smartRecompressedCount = 0;
+        let totalImagesRecompressed = 0;
         let targetMisses = 0;
 
         for (let i = 0; i < selectedFiles.length; i++) {
@@ -896,6 +1083,9 @@ async function compressPDFs() {
 
                 if (result.flattened) {
                     flattenedCount++;
+                } else if (result.recompressed) {
+                    smartRecompressedCount++;
+                    totalImagesRecompressed += result.recompressedImages || 0;
                 }
 
                 if (targetSizeBytes && !result.targetMet) {
@@ -940,67 +1130,10 @@ async function compressPDFs() {
             totalCompressedSize: summaryCompressedSize,
             totalDeltaText,
             flattenedCount,
+            smartRecompressedCount,
+            totalImagesRecompressed,
             targetMisses
         });
-        return;
-
-        const totalDownloadSize = successfulCompressions.reduce((sum, item) => sum + item.compressedSize, 0);
-        const storageCheck = await checkStorageQuota(totalDownloadSize);
-        if (!storageCheck.hasSpace) {
-            throw new Error(storageCheck.error || 'Not enough storage space to complete the downloads.');
-        }
-
-        updateProgress(
-            successfulCompressions.length,
-            successfulCompressions.length,
-            'Preparing downloads...',
-            `Output size: ${formatFileSize(totalDownloadSize)}`
-        );
-
-        const results = await downloadMultiplePDFs(
-            successfulCompressions.map((item) => ({
-                bytes: item.bytes,
-                filename: item.filename
-            })),
-            100
-        );
-
-        const totalOriginalSize = successfulCompressions.reduce((sum, item) => sum + item.originalSize, 0);
-        const totalCompressedSize = successfulCompressions.reduce((sum, item) => sum + item.compressedSize, 0);
-        const totalDeltaPercent = totalOriginalSize > 0
-            ? (Math.abs(totalOriginalSize - totalCompressedSize) / totalOriginalSize * 100).toFixed(1)
-            : '0.0';
-
-        let successMsg = `Successfully processed ${successfulCompressions.length} out of ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}.`;
-        successMsg += totalCompressedSize <= totalOriginalSize
-            ? `\nTotal size reduction: ${totalDeltaPercent}%`
-            : `\nTotal size change: increased by ${totalDeltaPercent}%`;
-
-        if (flattenedCount > 0) {
-            successMsg += `\nImage-flattened files: ${flattenedCount}`;
-            successMsg += '\nSearchable text, links, forms, and metadata may not be preserved in those files.';
-        }
-
-        if (targetSizeBytes && targetMisses > 0) {
-            successMsg += `\nTarget not reached for ${targetMisses} file${targetMisses !== 1 ? 's' : ''}; the smallest result was used instead.`;
-        }
-
-        if (failedCompressions.length > 0 || results.failed > 0) {
-            const allFailures = [
-                ...failedCompressions.map((item) => `• ${item.name}: ${item.error}`),
-                ...results.errors.map((item) => `• ${item.filename}: ${item.error}`)
-            ];
-
-            if (allFailures.length > 0) {
-                successMsg += '\n\nFailed compressions:\n' + allFailures.join('\n');
-            }
-
-            showWarningMessage(successMsg);
-        } else {
-            showSuccessMessage(successMsg);
-        }
-
-        clearAllFiles();
     } catch (error) {
         console.error('Error compressing PDFs:', error);
         showErrorMessage(error.message || 'An error occurred while compressing PDFs. Please try again.');

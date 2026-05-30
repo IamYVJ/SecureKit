@@ -92,7 +92,7 @@ function resetSensitiveInputs() {
 
 async function loadSecurePdfModule() {
     if (!securePdfModulePromise) {
-        securePdfModulePromise = import('https://cdn.jsdelivr.net/npm/@pdfsmaller/pdf-encrypt-lite@1.0.0/+esm')
+        securePdfModulePromise = import('./lib/pdf-encrypt-lite.js')
             .then((module) => {
                 if (typeof module.encryptPDF !== 'function') {
                     throw new Error('Secure PDF module loaded without encryption support.');
@@ -187,64 +187,36 @@ async function addFiles(files) {
     }
 }
 
-function updateUI() {
-    try {
-        if (workflowStage === 'processing') {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'none';
-            processingSection.style.display = 'flex';
-            completionSection.style.display = 'none';
-            if (infoSection) {
-                infoSection.style.display = 'none';
-            }
-            return;
-        }
+const sections = {
+    upload: uploadSection,
+    files: filesSection,
+    processing: processingSection,
+    completion: completionSection,
+    info: infoSection
+};
 
-        if (workflowStage === 'completed') {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'none';
-            processingSection.style.display = 'none';
-            completionSection.style.display = 'block';
-            if (infoSection) {
-                infoSection.style.display = 'none';
-            }
-            return;
-        }
-
-        processingSection.style.display = 'none';
-        completionSection.style.display = 'none';
-
-        if (infoSection) {
-            infoSection.style.display = 'block';
-        }
-
-        if (selectedFiles.length > 0) {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'block';
-            fileCount.textContent = String(selectedFiles.length);
-            totalSize.textContent = formatFileSize(
-                selectedFiles.reduce((sum, file) => sum + file.size, 0)
-            );
-            renderFilesList();
-        } else {
-            uploadSection.style.display = 'block';
-            filesSection.style.display = 'none';
-        }
-    } catch (error) {
-        console.error('Error updating UI:', error);
-        showErrorMessage('UI update failed. Please refresh the page.');
+function setupHandler() {
+    if (selectedFiles.length > 0) {
+        uploadSection.style.display = 'none';
+        filesSection.style.display = 'block';
+        fileCount.textContent = String(selectedFiles.length);
+        totalSize.textContent = formatFileSize(
+            selectedFiles.reduce((sum, file) => sum + file.size, 0)
+        );
+        renderFilesList();
+    } else {
+        uploadSection.style.display = 'block';
+        filesSection.style.display = 'none';
     }
+}
+
+function updateUI() {
+    applyWorkflowStage(workflowStage, sections, { setupHandler });
 }
 
 function setWorkflowStage(stage) {
     workflowStage = stage;
-    updateUI();
-
-    if (stage === 'processing') {
-        processingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (stage === 'completed') {
-        completionSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    applyWorkflowStage(stage, sections, { setupHandler, scrollOnTransition: true });
 }
 
 function renderFilesList() {

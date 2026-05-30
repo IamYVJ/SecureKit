@@ -4,20 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self'; 
+    default-src 'self';
     script-src 'self';
-    style-src 'self' 'unsafe-inline'; 
-    img-src 'self' data: blob:; 
-    font-src 'self'; 
-    connect-src 'self'; 
-    object-src 'none'; 
-    base-uri 'self'; 
-    form-action 'self'; 
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob:;
+    font-src 'self';
+    connect-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
     frame-ancestors 'none';
 ">
-    <title>Merge PDF - SecureKit</title>
+    <title>Image to PDF - SecureKit</title>
 
-    <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="merge-style.css">
     <link rel="stylesheet" href="validation-styles.css">
@@ -25,13 +24,11 @@
 <body>
     <div class="grain-overlay"></div>
 
-    <!-- Header -->
     <header>
         <nav class="container">
             <a href="index.html#hero" class="logo-link">
                 <span class="logo-text">Secure<span class="accent">Kit</span></span>
             </a>
-
             <ul class="nav-links">
                 <li><a href="merge.html">Merge</a></li>
                 <li><a href="split.html">Split</a></li>
@@ -44,20 +41,17 @@
         </nav>
     </header>
 
-    <!-- Main Content -->
     <main class="tool-page">
         <div class="container">
-            <!-- Tool Header -->
             <div class="tool-header-section">
                 <div class="tool-icon-large">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/>
-                        <path d="M14 2v6h6M12 18v-6m-3 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M14 2v6h6M9 13l3-3 3 3M12 10v7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </div>
-
-                <h1 class="tool-title">Merge <span class="accent">PDF</span></h1>
-                <p class="tool-description">Combine multiple PDF files into one document. All processing happens locally in your browser.</p>
+                <h1 class="tool-title">Image to <span class="accent">PDF</span></h1>
+                <p class="tool-description">Combine JPG and PNG images into a single PDF. Reorder pages by dragging. All processing happens locally in your browser.</p>
 
                 <div class="security-badge">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -67,44 +61,52 @@
                 </div>
             </div>
 
-            <!-- Upload Section -->
             <div class="upload-section" id="uploadSection">
                 <div class="upload-area" id="uploadArea">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" class="upload-icon">
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <h3>Drop PDF files here</h3>
-                    <p>or click to browse</p>
-                    <input type="file" id="fileInput" accept=".pdf" multiple hidden>
+                    <h3>Drop images here</h3>
+                    <p>or click to browse - JPG and PNG supported</p>
+                    <input type="file" id="fileInput" accept="image/jpeg,image/png" multiple hidden>
                     <button class="browse-button" id="browseButton">
-                        <span>Select PDF Files</span>
+                        <span>Select Images</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Files Section -->
             <div class="files-section" id="filesSection" style="display: none;">
                 <div class="files-header">
-                    <h3>Selected Files: <span id="fileCount">0</span></h3>
-                    <div id="totalSizeIndicator">Total size: <span id="totalSize">0 Bytes</span></div>
-                    <button class="secondary-button" id="addMoreButton">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                        <span>Add More</span>
-                    </button>
+                    <h3>Selected Images (<span id="fileCount">0</span>)</h3>
+                    <div class="files-header-actions">
+                        <button class="secondary-button" id="addMoreButton">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            <span>Add More</span>
+                        </button>
+                        <button class="secondary-button" id="clearButton">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>Clear All</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="files-info">
+                    <p class="drag-hint">Drag and drop to reorder. Each image becomes one PDF page in the order shown.</p>
                 </div>
 
                 <div class="files-list" id="filesList"></div>
 
-                <!-- Additional Options Accordion -->
                 <div class="options-accordion">
                     <button class="accordion-header" id="accordionToggle">
                         <span class="accordion-title">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
-                            Additional Options
+                            PDF Options
                         </span>
                         <svg class="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
                             <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -113,52 +115,71 @@
 
                     <div class="accordion-content" id="accordionContent">
                         <div class="option-group">
-                            <label class="toggle-label">
-                                <span class="toggle-text">
-                                    <span class="toggle-title">Select specific pages from PDFs</span>
-                                    <span class="toggle-hint">Choose which pages to include from each PDF</span>
-                                </span>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="enablePageSelection">
-                                    <span class="toggle-slider"></span>
-                                </div>
-                            </label>
+                            <label for="pageSize" class="input-label">Page size</label>
+                            <select id="pageSize" class="text-input">
+                                <option value="auto" selected>Auto (match each image)</option>
+                                <option value="a4">A4 (210 x 297 mm)</option>
+                                <option value="letter">Letter (8.5 x 11 in)</option>
+                                <option value="legal">Legal (8.5 x 14 in)</option>
+                                <option value="a3">A3 (297 x 420 mm)</option>
+                                <option value="a5">A5 (148 x 210 mm)</option>
+                            </select>
+                        </div>
+
+                        <div class="option-group">
+                            <label for="orientation" class="input-label">Orientation</label>
+                            <select id="orientation" class="text-input">
+                                <option value="auto" selected>Auto (match each image)</option>
+                                <option value="portrait">Portrait</option>
+                                <option value="landscape">Landscape</option>
+                            </select>
+                        </div>
+
+                        <div class="option-group">
+                            <label for="margin" class="input-label">Margin</label>
+                            <select id="margin" class="text-input">
+                                <option value="0" selected>None</option>
+                                <option value="12">Small (4 mm)</option>
+                                <option value="28">Medium (10 mm)</option>
+                                <option value="56">Large (20 mm)</option>
+                            </select>
+                        </div>
+
+                        <div class="option-group">
+                            <label for="fitMode" class="input-label">Fit mode</label>
+                            <select id="fitMode" class="text-input">
+                                <option value="contain" selected>Fit (preserve aspect, no crop)</option>
+                                <option value="cover">Fill (preserve aspect, crop edges)</option>
+                                <option value="stretch">Stretch (distort to fill)</option>
+                            </select>
+                            <p class="input-hint">Only applies when page size is fixed and aspect ratios differ.</p>
                         </div>
 
                         <div class="option-group">
                             <label for="outputFilename" class="input-label">Output filename</label>
-                            <input type="text" id="outputFilename" class="text-input" placeholder="MergedPDF_20260203">
-                            <p class="input-hint">Default format: MergedPDF_YYYYMMDD (.pdf will be added automatically)</p>
+                            <input type="text" id="outputFilename" class="text-input" placeholder="ImagesToPDF_20260203">
                         </div>
                     </div>
                 </div>
 
                 <div class="action-buttons">
-                    <button class="secondary-button" id="clearButton">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        <span>Clear All</span>
-                    </button>
-
-                    <button class="primary-button" id="mergeButton">
+                    <button class="primary-button" id="convertButton">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/>
-                            <path d="M14 2v6h6M12 18v-6m-3 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M14 2v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         </svg>
-                        <span>Merge PDFs</span>
+                        <span>Convert to PDF</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Processing Section -->
             <div class="processing-section" id="processingSection" style="display: none;">
                 <div class="processing-card">
                     <div class="spinner"></div>
-                    <h3 id="processingTitle">Merging PDFs...</h3>
-                    <p id="processingMessage">Please wait while we combine your files</p>
+                    <h3 id="processingTitle">Converting images to PDF...</h3>
+                    <p id="processingMessage">Please wait while we build your document</p>
                     <div class="progress-info" id="progressInfo" style="display: none;">
-                        <div class="progress-text">Processing file <span id="currentFile">1</span> of <span id="totalFiles">1</span></div>
+                        <div class="progress-text">Processing image <span id="currentFile">1</span> of <span id="totalFiles">1</span></div>
                         <div class="processing-stats" id="processingStats"></div>
                     </div>
                 </div>
@@ -171,85 +192,51 @@
                             <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
-                    <h3 id="completionTitle">Merged PDF Ready</h3>
-                    <p id="completionSummary">Your merged file is ready to save.</p>
+                    <h3 id="completionTitle">PDF Ready</h3>
+                    <p id="completionSummary">Your PDF is ready to save.</p>
                     <div class="completion-stats-grid" id="completionStats"></div>
                     <div class="completion-details" id="completionDetails"></div>
                     <div class="completion-actions">
                         <button class="primary-button" id="saveButton">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2"/>
                                 <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            <span>Save File</span>
-                        </button>
-                        <button class="secondary-button" id="compressMergedButton">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"/>
-                                <path d="M14 2v6h6M9 15l2-2 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <span>Compress File</span>
+                            <span>Save PDF</span>
                         </button>
                         <button class="secondary-button" id="anotherButton">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
-                            <span>Merge Another</span>
+                            <span>Convert More</span>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Info Section -->
             <div class="info-section">
                 <h3>How It Works</h3>
-
                 <div class="info-grid">
                     <div class="info-card">
                         <div class="info-number">1</div>
-                        <h4>Upload Files</h4>
-                        <p>Select or drag and drop multiple PDF files</p>
+                        <h4>Select Images</h4>
+                        <p>Pick JPG or PNG files - one or many</p>
                     </div>
-
                     <div class="info-card">
                         <div class="info-number">2</div>
-                        <h4>Arrange & Select</h4>
-                        <p>Drag to reorder files and optionally select specific pages</p>
+                        <h4>Order &amp; Configure</h4>
+                        <p>Drag to reorder, choose page size and margins</p>
                     </div>
-
                     <div class="info-card">
                         <div class="info-number">3</div>
-                        <h4>Merge</h4>
-                        <p>Click merge and download your combined PDF</p>
-                    </div>
-                </div>
-
-                <div class="page-selection-guide">
-                    <h4>Page Selection Format</h4>
-                    <div class="format-examples">
-                        <div class="format-item">
-                            <code>2-5</code>
-                            <span>Pages 2 through 5</span>
-                        </div>
-                        <div class="format-item">
-                            <code>2,5,6,7</code>
-                            <span>Individual pages 2, 5, 6, and 7</span>
-                        </div>
-                        <div class="format-item">
-                            <code>2-5,7,9</code>
-                            <span>Pages 2-5 plus pages 7 and 9</span>
-                        </div>
-                        <div class="format-item">
-                            <code>1,3-6,10</code>
-                            <span>Page 1, pages 3-6, and page 10</span>
-                        </div>
+                        <h4>Download PDF</h4>
+                        <p>Get one PDF with each image on its own page</p>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Footer -->
     <footer>
         <div class="container">
             <div class="footer-content">
@@ -259,7 +246,6 @@
                     </a>
                     <p class="footer-tagline">Your data never leaves your device</p>
                 </div>
-
                 <div class="footer-info">
                     <p>&copy; 2026 SecureKit</p>
                     <p class="footer-note">Client-side PDF processing for everyone</p>
@@ -268,12 +254,10 @@
         </div>
     </footer>
 
-    <!-- Scripts -->
     <script src="lib/pdf-lib.min.js"></script>
     <script src="shared-utils.js"></script>
     <script src="file-size-validation.js"></script>
-    <script src="merge.js"></script>
+    <script src="image-to-pdf.js"></script>
     <script src="sw-register.js"></script>
-
 </body>
 </html>

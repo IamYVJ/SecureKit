@@ -179,8 +179,11 @@ function setupDragAndDrop(uploadArea, onFilesDrop, options = {}) {
     const {
         allowMultiple = true,
         fileType = 'application/pdf',
-        dragOverClass = 'drag-over'
+        dragOverClass = 'drag-over',
+        rejectMessage = 'Please drop supported files only.'
     } = options;
+
+    const allowedTypes = Array.isArray(fileType) ? fileType : [fileType];
 
     if (!uploadArea) {
         console.warn('Upload area element not found');
@@ -203,15 +206,15 @@ function setupDragAndDrop(uploadArea, onFilesDrop, options = {}) {
                 uploadArea.classList.remove(dragOverClass);
 
                 const files = Array.from(e.dataTransfer.files).filter(file => {
-                    if (file.type === fileType) {
+                    if (allowedTypes.includes(file.type)) {
                         return true;
                     }
-                    console.warn('Skipping non-PDF file:', file.name);
+                    console.warn('Skipping unsupported file:', file.name, file.type);
                     return false;
                 });
 
                 if (files.length === 0) {
-                    showWarningMessage('Please drop PDF files only.');
+                    showWarningMessage(rejectMessage);
                     return;
                 }
 
@@ -502,24 +505,169 @@ function setProcessingState(processing, button, processingSection, originalText,
 }
 
 // ============================================
+// ZIP ARCHIVE DOWNLOAD
+// ============================================
+
+/**
+ * Pack a set of files into a single ZIP and trigger one download.
+ * Requires JSZip to be loaded on the page.
+ *
+ * @param {Array} items - Array of { filename, bytes?: Uint8Array, blob?: Blob }
+ * @param {string} archiveName - Output filename (without .zip extension)
+ * @returns {Promise<{successful: number, failed: number, errors: Array}>}
+ */
+async function downloadAsZip(items, archiveName) {
+    if (typeof JSZip === 'undefined') {
+        throw new Error('JSZip is not loaded on this page.');
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+        throw new Error('No files to archive.');
+    }
+
+    const zip = new JSZip();
+    const errors = [];
+    let added = 0;
+
+    for (const item of items) {
+        try {
+            const content = item.blob ?? item.bytes;
+            if (!content) {
+                errors.push({ filename: item.filename, error: 'No content' });
+                continue;
+            }
+            zip.file(item.filename, content);
+            added++;
+        } catch (e) {
+            errors.push({ filename: item.filename, error: e.message || 'Failed to add' });
+        }
+    }
+
+    if (added === 0) {
+        throw new Error('Could not add any files to the archive.');
+    }
+
+    // PDFs and JPEGs/PNGs are already compressed — STORE avoids redundant work.
+    const archiveBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+
+    const safeName = (typeof sanitizeFilename === 'function' ? sanitizeFilename(archiveName) : archiveName) || 'archive';
+    const url = URL.createObjectURL(archiveBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = safeName + '.zip';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, 100);
+
+    return {
+        successful: added,
+        failed: errors.length,
+        errors
+    };
+}
+
+// ============================================
+// WORKFLOW STAGE MANAGEMENT
+// ============================================
+
+/**
+ * Apply a workflow stage to the UI (show/hide sections, optionally scroll).
+ * The "setup" stage delegates back to a tool-specific handler since each tool's
+ * setup layout differs (single-file vs multi-file vs reorderable list).
+ *
+ * @param {string} stage - 'setup' | 'processing' | 'completed'
+ * @param {Object} sections - { upload, files, processing, completion, info }
+ * @param {Object} [options]
+ * @param {boolean} [options.scrollOnTransition=false] - Scroll into view on processing/completed
+ * @param {Function} [options.setupHandler] - Called with sections when stage === 'setup'
+ */
+function applyWorkflowStage(stage, sections, options = {}) {
+    const { upload, files, processing, completion, info } = sections || {};
+    const { scrollOnTransition = false, setupHandler = null } = options;
+
+    if (stage === 'processing') {
+        if (upload) upload.style.display = 'none';
+        if (files) files.style.display = 'none';
+        if (processing) processing.style.display = 'flex';
+        if (completion) completion.style.display = 'none';
+        if (info) info.style.display = 'none';
+        if (scrollOnTransition && processing) {
+            processing.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+    }
+
+    if (stage === 'completed') {
+        if (upload) upload.style.display = 'none';
+        if (files) files.style.display = 'none';
+        if (processing) processing.style.display = 'none';
+        if (completion) completion.style.display = 'block';
+        if (info) info.style.display = 'none';
+        if (scrollOnTransition && completion) {
+            completion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+    }
+
+    // setup
+    if (processing) processing.style.display = 'none';
+    if (completion) completion.style.display = 'none';
+    if (info) info.style.display = 'block';
+    if (typeof setupHandler === 'function') {
+        try {
+            setupHandler(sections);
+        } catch (err) {
+            console.error('setupHandler threw:', err);
+        }
+    }
+}
+
+// ============================================
+// PROGRESS DISPLAY
+// ============================================
+
+/**
+ * Update the progress display. Element refs are passed in so each tool can wire
+ * its own element IDs (e.g., compress uses 'compressionStats', others use 'processingStats').
+ *
+ * @param {Object} elements - { currentEl, totalEl, messageEl, statsEl, infoEl }
+ * @param {number|string} current - Current item number
+ * @param {number|string} total - Total item count
+ * @param {string} [message] - Progress message
+ * @param {string} [stats] - Secondary stats line
+ */
+function updateProgressUI(elements, current, total, message, stats = '') {
+    const { currentEl, totalEl, messageEl, statsEl, infoEl } = elements || {};
+    if (currentEl) currentEl.textContent = String(current);
+    if (totalEl) totalEl.textContent = String(total);
+    if (messageEl && message != null) messageEl.textContent = message;
+    if (statsEl) statsEl.textContent = stats;
+    if (infoEl) infoEl.style.display = 'block';
+}
+
+/**
+ * Reset the progress display to default labels and hide the progress info row.
+ *
+ * @param {Object} elements - { titleEl, messageEl, statsEl, infoEl }
+ * @param {Object} [defaults] - { title, message }
+ */
+function resetProgressUI(elements, defaults = {}) {
+    const { titleEl, messageEl, statsEl, infoEl } = elements || {};
+    if (titleEl && defaults.title != null) titleEl.textContent = defaults.title;
+    if (messageEl && defaults.message != null) messageEl.textContent = defaults.message;
+    if (statsEl) statsEl.textContent = '';
+    if (infoEl) infoEl.style.display = 'none';
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
 try {
     console.log('✅ Shared Utilities Module Loaded');
-    console.log('   Available functions:');
-    console.log('   • formatFileSize()');
-    console.log('   • getDefaultFilename()');
-    console.log('   • downloadPDF()');
-    console.log('   • downloadMultiplePDFs()');
-    console.log('   • setupAccordion()');
-    console.log('   • setupDragAndDrop()');
-    console.log('   • setupRadioButtons()');
-    console.log('   • handleRadioToggle()');
-    console.log('   • isPDF()');
-    console.log('   • loadPDFWithValidation()');
-    console.log('   • parsePageSelection()');
-    console.log('   • setProcessingState()');
 } catch (error) {
     console.error('Error during shared utilities initialization:', error);
 }

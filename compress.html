@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
     default-src 'self'; 
-    script-src 'self' https://cdnjs.cloudflare.com; 
+    script-src 'self';
     style-src 'self' 'unsafe-inline'; 
     img-src 'self' data: blob:; 
     font-src 'self'; 
-    connect-src 'self' https://cdnjs.cloudflare.com; 
-    worker-src 'self' blob: https://cdnjs.cloudflare.com; 
+    connect-src 'self';
+    worker-src 'self' blob:;
     object-src 'none'; 
     base-uri 'self'; 
     form-action 'self';
@@ -32,8 +32,8 @@
                 <li><a href="split.html">Split</a></li>
                 <li><a href="compress.html">Compress</a></li>
                 <li><a href="secure.html">Secure</a></li>
-                <li><a href="index.html#pdf-to-image">PDF to Image</a></li>
-                <li><a href="index.html#image-to-pdf">Image to PDF</a></li>
+                <li><a href="pdf-to-image.html">PDF to Image</a></li>
+                <li><a href="image-to-pdf.html">Image to PDF</a></li>
                 <li><a href="index.html#about">About</a></li>
             </ul>
         </nav>
@@ -99,7 +99,7 @@
                                         <span class="recommended-badge">Recommended</span>
                                     </div>
                                 </div>
-                                <p class="option-description">Tries structural optimization first, then image-based compression when it produces a smaller file.</p>
+                                <p class="option-description">Re-encodes embedded JPEG images at moderate quality (downscales to 2400px max). Preserves text, forms, links, and vectors. Falls back to image-flatten only if needed.</p>
                             </div>
                         </label>
 
@@ -110,7 +110,7 @@
                                     <span class="option-circle"></span>
                                     <span class="option-title">Low Compression</span>
                                 </div>
-                                <p class="option-description">Prioritizes readability and preserves more detail while still attempting size reduction.</p>
+                                <p class="option-description">Re-encodes embedded JPEG images at high quality with no downscaling. Lossless for non-image content. Smallest savings, highest fidelity.</p>
                             </div>
                         </label>
 
@@ -121,7 +121,7 @@
                                     <span class="option-circle"></span>
                                     <span class="option-title">High Compression</span>
                                 </div>
-                                <p class="option-description">Uses stronger image compression settings and may flatten pages into images for smaller output.</p>
+                                <p class="option-description">Aggressively recompresses JPEGs (downscales to 1600px max) and falls back to page-flattening when that produces a smaller file. Maximum savings, may lose searchable text on flattened files.</p>
                             </div>
                         </label>
 
@@ -149,8 +149,8 @@
                 </div>
 
                 <div class="compression-notice">
-                    <h4>Important</h4>
-                    <p>Image-based compression can significantly reduce size, especially for scanned PDFs, but searchable text, links, form fields, and some metadata may not survive in flattened output.</p>
+                    <h4>How it works</h4>
+                    <p>SecureKit first tries <strong>smart image recompression</strong> — re-encoding embedded JPEGs while keeping all text, vectors, forms, and links intact. Only when a smaller target requires it does it fall back to <strong>page-flattening</strong>, which renders pages to images and may drop searchable text and interactive elements.</p>
                 </div>
 
                 <div class="action-buttons">
@@ -294,10 +294,11 @@
         </div>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
+    <script src="lib/pdf.min.js"></script>
     <script src="shared-utils.js"></script>
     <script src="file-size-validation.js"></script>
     <script src="compress.js"></script>
+    <script src="sw-register.js"></script>
 </body>
 </html>

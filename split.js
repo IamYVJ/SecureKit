@@ -36,6 +36,7 @@ const saveButton = document.getElementById('saveButton');
 const anotherButton = document.getElementById('anotherButton');
 const infoSection = document.querySelector('.info-section');
 const baseFilename = document.getElementById('baseFilename');
+const downloadModeSelect = document.getElementById('downloadMode');
 const accordionToggle = document.getElementById('accordionToggle');
 const accordionContent = document.getElementById('accordionContent');
 const customPages = document.getElementById('customPages');
@@ -167,35 +168,24 @@ async function handleFile(file) {
     }
 }
 
-function updateUI() {
-    if (workflowStage === 'processing') {
-        uploadSection.style.display = 'none';
-        fileSection.style.display = 'none';
-        processingSection.style.display = 'flex';
-        completionSection.style.display = 'none';
-        if (infoSection) {
-            infoSection.style.display = 'none';
-        }
-        return;
-    }
+const sections = {
+    upload: uploadSection,
+    files: fileSection,
+    processing: processingSection,
+    completion: completionSection,
+    info: infoSection
+};
 
-    if (workflowStage === 'completed') {
-        uploadSection.style.display = 'none';
-        fileSection.style.display = 'none';
-        processingSection.style.display = 'none';
-        completionSection.style.display = 'block';
-        if (infoSection) {
-            infoSection.style.display = 'none';
-        }
-        return;
-    }
+const progressElements = {
+    titleEl: processingTitle,
+    messageEl: processingMessage,
+    statsEl: processingStats,
+    currentEl: currentFile,
+    totalEl: totalFiles,
+    infoEl: progressInfo
+};
 
-    processingSection.style.display = 'none';
-    completionSection.style.display = 'none';
-    if (infoSection) {
-        infoSection.style.display = 'block';
-    }
-
+function setupHandler() {
     if (selectedFile) {
         uploadSection.style.display = 'none';
         fileSection.style.display = 'block';
@@ -206,15 +196,13 @@ function updateUI() {
     }
 }
 
+function updateUI() {
+    applyWorkflowStage(workflowStage, sections, { setupHandler });
+}
+
 function setWorkflowStage(stage) {
     workflowStage = stage;
-    updateUI();
-
-    if (stage === 'processing') {
-        processingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (stage === 'completed') {
-        completionSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    applyWorkflowStage(stage, sections, { setupHandler, scrollOnTransition: true });
 }
 
 function renderFileDisplay() {
@@ -283,44 +271,14 @@ function updateProgress(fileIndex, totalCount, message, stats = '') {
     if (processingTitle) {
         processingTitle.textContent = `Splitting ${fileIndex} of ${totalCount}`;
     }
-
-    if (processingMessage) {
-        processingMessage.textContent = message;
-    }
-
-    if (currentFile) {
-        currentFile.textContent = String(fileIndex);
-    }
-
-    if (totalFiles) {
-        totalFiles.textContent = String(totalCount);
-    }
-
-    if (processingStats) {
-        processingStats.textContent = stats;
-    }
-
-    if (progressInfo) {
-        progressInfo.style.display = 'block';
-    }
+    updateProgressUI(progressElements, fileIndex, totalCount, message, stats);
 }
 
 function resetProgress() {
-    if (processingTitle) {
-        processingTitle.textContent = 'Splitting PDF...';
-    }
-
-    if (processingMessage) {
-        processingMessage.textContent = 'Please wait while we process your file';
-    }
-
-    if (processingStats) {
-        processingStats.textContent = '';
-    }
-
-    if (progressInfo) {
-        progressInfo.style.display = 'none';
-    }
+    resetProgressUI(progressElements, {
+        title: 'Splitting PDF...',
+        message: 'Please wait while we process your file'
+    });
 }
 
 function renderCompletionStats(items) {
@@ -392,10 +350,25 @@ async function saveSplitResults() {
         return;
     }
 
+    const mode = downloadModeSelect?.value || 'zip';
+
     try {
-        const results = await downloadMultiplePDFs(lastSplitResult.files, 120);
-        if (results.failed > 0) {
-            showWarningMessage(`Started saving split files, but ${results.failed} download${results.failed !== 1 ? 's' : ''} failed.`);
+        if (mode === 'zip') {
+            const archiveBase = sanitizeFilename(baseFilename?.value?.trim() || '')
+                || getDefaultFilename('SplitPDF');
+            const items = lastSplitResult.files.map((f) => ({
+                filename: f.filename.endsWith('.pdf') ? f.filename : `${f.filename}.pdf`,
+                bytes: f.bytes
+            }));
+            const result = await downloadAsZip(items, archiveBase);
+            if (result.failed > 0) {
+                showWarningMessage(`Archive ready, but ${result.failed} file${result.failed !== 1 ? 's' : ''} could not be added.`);
+            }
+        } else {
+            const results = await downloadMultiplePDFs(lastSplitResult.files, 120);
+            if (results.failed > 0) {
+                showWarningMessage(`Started saving split files, but ${results.failed} download${results.failed !== 1 ? 's' : ''} failed.`);
+            }
         }
     } catch (error) {
         console.error('Error saving split files:', error);

@@ -276,105 +276,57 @@ async function addFiles(files) {
 // UI FUNCTIONS
 // ============================================
 
-function updateUI() {
-    try {
-        if (workflowStage === 'processing') {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'none';
-            processingSection.style.display = 'flex';
-            completionSection.style.display = 'none';
-            if (infoSection) {
-                infoSection.style.display = 'none';
-            }
-            return;
-        }
+const sections = {
+    upload: uploadSection,
+    files: filesSection,
+    processing: processingSection,
+    completion: completionSection,
+    info: infoSection
+};
 
-        if (workflowStage === 'completed') {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'none';
-            processingSection.style.display = 'none';
-            completionSection.style.display = 'block';
-            if (infoSection) {
-                infoSection.style.display = 'none';
-            }
-            return;
-        }
+const progressElements = {
+    titleEl: processingTitle,
+    messageEl: processingMessage,
+    statsEl: processingStats,
+    currentEl: currentFile,
+    totalEl: totalFiles,
+    infoEl: progressInfo
+};
 
-        processingSection.style.display = 'none';
-        completionSection.style.display = 'none';
-        if (infoSection) {
-            infoSection.style.display = 'block';
-        }
-
-        if (selectedFiles.length > 0) {
-            uploadSection.style.display = 'none';
-            filesSection.style.display = 'block';
-            renderFilesList();
-            fileCount.textContent = selectedFiles.length;
-            updateSizeDisplay();
-        } else {
-            uploadSection.style.display = 'block';
-            filesSection.style.display = 'none';
-        }
-    } catch (error) {
-        console.error('Error updating UI:', error);
-        showErrorMessage('UI update failed. Please refresh the page.');
+function setupHandler() {
+    if (selectedFiles.length > 0) {
+        uploadSection.style.display = 'none';
+        filesSection.style.display = 'block';
+        renderFilesList();
+        fileCount.textContent = selectedFiles.length;
+        updateSizeDisplay();
+    } else {
+        uploadSection.style.display = 'block';
+        filesSection.style.display = 'none';
     }
+}
+
+function updateUI() {
+    applyWorkflowStage(workflowStage, sections, { setupHandler });
 }
 
 function setWorkflowStage(stage) {
     workflowStage = stage;
-    updateUI();
-
-    if (stage === 'processing') {
-        processingSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (stage === 'completed') {
-        completionSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    applyWorkflowStage(stage, sections, { setupHandler, scrollOnTransition: true });
 }
 
 function updateProgress(fileIndex, totalCount, message, stats = '') {
     if (processingTitle) {
         processingTitle.textContent = `Merging ${fileIndex} of ${totalCount}`;
     }
-
-    if (processingMessage) {
-        processingMessage.textContent = message;
-    }
-
-    if (currentFile) {
-        currentFile.textContent = String(fileIndex);
-    }
-
-    if (totalFiles) {
-        totalFiles.textContent = String(totalCount);
-    }
-
-    if (processingStats) {
-        processingStats.textContent = stats;
-    }
-
-    if (progressInfo) {
-        progressInfo.style.display = 'block';
-    }
+    updateProgressUI(progressElements, fileIndex, totalCount, message, stats);
 }
 
 function resetProgress() {
-    if (processingTitle) {
-        processingTitle.textContent = 'Merging PDFs...';
-    }
-
-    if (processingMessage) {
-        processingMessage.textContent = 'Please wait while we combine your files';
-    }
-
-    if (processingStats) {
-        processingStats.textContent = '';
-    }
-
-    if (progressInfo) {
-        progressInfo.style.display = 'none';
-    }
+    resetProgressUI(progressElements, {
+        title: 'Merging PDFs...',
+        message: 'Please wait while we combine your files'
+    });
 }
 
 function renderCompletionStats(items) {
@@ -508,85 +460,6 @@ function startAnotherMerge() {
     clearAllFiles();
     outputFilename.value = getDefaultFilename('MergedPDF');
     setWorkflowStage('setup');
-}
-
-function renderFilesList() {
-    try {
-        if (!filesList) {
-            console.error('Files list element not found');
-            return;
-        }
-
-        filesList.innerHTML = '';
-
-        selectedFiles.forEach((fileData, index) => {
-            try {
-                const fileItem = document.createElement('div');
-                fileItem.className = 'file-item';
-                fileItem.draggable = true;
-                fileItem.dataset.index = index;
-
-                const pageInputHtml = `
-                    <div class="page-selection-wrapper ${enablePageSelection?.checked ? 'active' : ''}">
-                        <input type="text" 
-                               class="page-selection-input" 
-                               placeholder="e.g., 1,3,5-7" 
-                               value="${fileData.pageSelection || ''}"
-                               data-index="${index}">
-                        <span class="page-hint">Leave empty for all pages</span>
-                    </div>
-                `;
-
-                fileItem.innerHTML = `
-                    <div class="drag-handle">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
-                            <circle cx="12" cy="4" r="1.5" fill="currentColor"/>
-                            <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
-                            <circle cx="12" cy="8" r="1.5" fill="currentColor"/>
-                            <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
-                            <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                        </svg>
-                    </div>
-                    <div class="file-info">
-                        <div class="file-name">${escapeHtml(fileData.name)}</div>
-                        <div class="file-details">
-                            ${fileData.size} • ${fileData.pageCount} page${fileData.pageCount !== 1 ? 's' : ''}
-                        </div>
-                        ${pageInputHtml}
-                    </div>
-                    <button class="remove-file" data-index="${index}">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                `;
-
-                // Drag events
-                fileItem.addEventListener('dragstart', handleDragStart);
-                fileItem.addEventListener('dragover', handleDragOver);
-                fileItem.addEventListener('drop', handleDrop);
-                fileItem.addEventListener('dragend', handleDragEnd);
-
-                // Remove button
-                const removeBtn = fileItem.querySelector('.remove-file');
-                removeBtn.addEventListener('click', () => removeFile(index));
-
-                // Page selection input
-                const pageInput = fileItem.querySelector('.page-selection-input');
-                pageInput?.addEventListener('input', (e) => {
-                    selectedFiles[index].pageSelection = e.target.value;
-                });
-
-                filesList.appendChild(fileItem);
-            } catch (error) {
-                console.error('Error rendering file item:', fileData.name, error);
-            }
-        });
-    } catch (error) {
-        console.error('Error in renderFilesList:', error);
-    }
 }
 
 function renderFilesList() {

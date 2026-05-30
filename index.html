@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="
     default-src 'self'; 
-    script-src 'self' https://cdnjs.cloudflare.com; 
+    script-src 'self';
     style-src 'self' 'unsafe-inline'; 
     img-src 'self' data: blob:; 
     font-src 'self'; 
@@ -31,8 +31,8 @@
                 <li><a href="split.html">Split</a></li>
                 <li><a href="compress.html">Compress</a></li>
                 <li><a href="secure.html">Secure</a></li>
-                <li><a href="#pdf-to-image">PDF to Image</a></li>
-                <li><a href="#image-to-pdf">Image to PDF</a></li>
+                <li><a href="pdf-to-image.html">PDF to Image</a></li>
+                <li><a href="image-to-pdf.html">Image to PDF</a></li>
                 <li><a href="#about">About</a></li>
             </ul>
         </nav>
@@ -98,7 +98,7 @@
             <div class="container">
                 <div class="section-header">
                     <h2 class="section-title">PDF Toolkit</h2>
-                    <p class="section-description">Four live tools today, with two more in progress. All processing stays in your browser.</p>
+                    <p class="section-description">Six live tools, all running entirely in your browser.</p>
                 </div>
 
                 <div class="tools-grid">
@@ -190,9 +190,12 @@
                             <h3>PDF to Image</h3>
                         </div>
                         <p class="tool-description">Convert PDF pages to high-quality JPG or PNG images</p>
-                        <span class="tool-button tool-button-disabled" aria-disabled="true">
-                            <span>Coming Soon</span>
-                        </span>
+                        <a href="pdf-to-image.html" class="tool-button">
+                            <span>Start Converting</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
                     </article>
 
                     <article id="image-to-pdf" class="tool-card">
@@ -206,9 +209,12 @@
                             <h3>Image to PDF</h3>
                         </div>
                         <p class="tool-description">Create professional PDF documents from your images</p>
-                        <span class="tool-button tool-button-disabled" aria-disabled="true">
-                            <span>Coming Soon</span>
-                        </span>
+                        <a href="image-to-pdf.html" class="tool-button">
+                            <span>Start Converting</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path d="M5 12h14m-7-7l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
                     </article>
                 </div>
             </div>
@@ -301,5 +307,7 @@
             </div>
         </div>
     </footer>
+
+    <script src="sw-register.js"></script>
 </body>
 </html>

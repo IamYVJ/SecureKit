@@ -881,35 +881,7 @@ function checkBrowserCompatibility() {
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
-
-/**
- * Format bytes to human-readable size
- * @param {number} bytes - Size in bytes
- * @returns {string} - Formatted size string
- */
-function formatFileSize(bytes) {
-    try {
-        if (typeof bytes !== 'number' || bytes < 0) {
-            return '0 Bytes';
-        }
-
-        if (bytes === 0) return '0 Bytes';
-
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        if (i < 0 || i >= sizes.length) {
-            return bytes + ' Bytes';
-        }
-
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-
-    } catch (error) {
-        console.error('Error in formatFileSize:', error);
-        return bytes + ' Bytes';
-    }
-}
+// Note: formatFileSize() lives in shared-utils.js (loaded before this file).
 
 /**
  * Clear all active validation messages
