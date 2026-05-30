@@ -93,16 +93,6 @@ After updating, bump `CACHE_VERSION` in `sw.js` so users get the new files inste
 
 ---
 
-## Hosting on GitHub Pages
-
-1. Push the repo to GitHub.
-2. Settings → Pages → Source: `main` branch, `/` (root).
-3. Wait a minute, then visit `https://<your-username>.github.io/<repo-name>/`.
-
-All paths are relative, so the site works under any subpath.
-
----
-
 ## Attribution
 
 - [pdf-lib](https://pdf-lib.js.org/) — MIT — PDF creation and modification
