@@ -9,6 +9,20 @@ let workflowStage = 'setup';
 let lastProtectionResult = null;
 let securePdfModulePromise = null;
 
+// PDF 1.7, Table 22: the /P bitmask. A set bit allows the action; bits not listed
+// here are reserved and fixed by the encryption library. "All allowed" is the
+// default, which matches how the tool behaved before permissions existed.
+const PERMISSION_BITS = [
+    { id: 'permPrint', bit: 1 << 2, label: 'printing' },
+    { id: 'permModify', bit: 1 << 3, label: 'editing content' },
+    { id: 'permCopy', bit: 1 << 4, label: 'copying text and images' },
+    { id: 'permAnnotate', bit: 1 << 5, label: 'comments and annotations' },
+    { id: 'permForms', bit: 1 << 8, label: 'filling in forms' },
+    { id: 'permAccessibility', bit: 1 << 9, label: 'screen reader access' },
+    { id: 'permAssemble', bit: 1 << 10, label: 'extracting or reordering pages' },
+    { id: 'permPrintHighRes', bit: 1 << 11, label: 'high-quality printing' }
+];
+
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
 const browseButton = document.getElementById('browseButton');
@@ -25,6 +39,11 @@ const confirmPasswordInput = document.getElementById('confirmPassword');
 const ownerPasswordInput = document.getElementById('ownerPassword');
 const filenameSuffixInput = document.getElementById('filenameSuffix');
 const showPasswordsCheckbox = document.getElementById('showPasswords');
+const permissionInputs = new Map(
+    PERMISSION_BITS.map((entry) => [entry.id, document.getElementById(entry.id)])
+);
+const printCheckbox = permissionInputs.get('permPrint');
+const printHighResCheckbox = permissionInputs.get('permPrintHighRes');
 const processingSection = document.getElementById('processingSection');
 const processingTitle = document.getElementById('processingTitle');
 const processingMessage = document.getElementById('processingMessage');
@@ -59,6 +78,8 @@ try {
     saveButton?.addEventListener('click', saveProtectedFiles);
     anotherButton?.addEventListener('click', startAnotherProtection);
     showPasswordsCheckbox?.addEventListener('change', updatePasswordVisibility);
+    printCheckbox?.addEventListener('change', updatePrintPermissionState);
+    updatePrintPermissionState();
 
     if (accordionToggle && accordionContent) {
         setupAccordion(accordionToggle, accordionContent);
@@ -81,12 +102,59 @@ function updatePasswordVisibility() {
     });
 }
 
+// High-quality printing is a qualifier on the print bit: with printing denied
+// outright it has nothing to qualify, so keep the two in step.
+function updatePrintPermissionState() {
+    if (!printCheckbox || !printHighResCheckbox) {
+        return;
+    }
+
+    const printingAllowed = printCheckbox.checked;
+    printHighResCheckbox.disabled = !printingAllowed;
+
+    if (!printingAllowed) {
+        printHighResCheckbox.checked = false;
+    }
+
+    printHighResCheckbox.closest('.checkbox-label')?.classList.toggle('is-disabled', !printingAllowed);
+}
+
+function buildPermissionMask() {
+    let mask = 0;
+    const denied = [];
+
+    PERMISSION_BITS.forEach((entry) => {
+        const input = permissionInputs.get(entry.id);
+
+        // A missing checkbox must not silently deny the action.
+        if (!input || input.checked) {
+            mask |= entry.bit;
+        } else {
+            denied.push(entry.label);
+        }
+    });
+
+    return { mask, denied };
+}
+
+function resetPermissionInputs() {
+    permissionInputs.forEach((input) => {
+        if (input) {
+            input.checked = true;
+            input.disabled = false;
+        }
+    });
+
+    updatePrintPermissionState();
+}
+
 function resetSensitiveInputs() {
     openPasswordInput.value = '';
     confirmPasswordInput.value = '';
     ownerPasswordInput.value = '';
     filenameSuffixInput.value = 'protected';
     showPasswordsCheckbox.checked = false;
+    resetPermissionInputs();
     updatePasswordVisibility();
 }
 
@@ -320,10 +388,24 @@ function getProtectionOptions() {
         return null;
     }
 
+    const { mask, denied } = buildPermissionMask();
+
+    // Restrictions are checked by the reader against the *user* password. Without a
+    // distinct owner password the open password is also the owner password, so the
+    // reader hands over full rights and the restrictions mean nothing.
+    if (denied.length > 0 && !ownerPassword) {
+        showWarningMessage(
+            'Set an owner password to make the permission restrictions stick. '
+            + 'Without one, the open password also unlocks full access.'
+        );
+    }
+
     return {
         openPassword,
         ownerPassword: ownerPassword || undefined,
-        filenameSuffix: suffixValue
+        filenameSuffix: suffixValue,
+        permissions: mask,
+        deniedPermissions: denied
     };
 }
 
@@ -348,6 +430,12 @@ function normalizeProtectionError(error) {
     }
 
     return message;
+}
+
+// The labels themselves contain "and" ("comments and annotations"), so a serial
+// "x, y and z" reads worse than a plain comma list here.
+function formatDeniedList(denied) {
+    return denied.join(', ');
 }
 
 function createCompletionStat(label, value) {
@@ -400,6 +488,20 @@ function renderCompletion() {
         ? '<strong>Owner password added:</strong> A separate owner password was also written into the protected files.'
         : '<strong>Owner password not set:</strong> Only the open password was applied for this batch.';
     completionDetails.appendChild(ownerNote);
+
+    const denied = lastProtectionResult.deniedPermissions || [];
+    const permissionsNote = document.createElement('div');
+    permissionsNote.className = 'completion-note';
+
+    if (denied.length === 0) {
+        permissionsNote.innerHTML = '<strong>Permissions:</strong> Printing, copying, editing, and the other document actions all stay allowed.';
+    } else if (lastProtectionResult.ownerPasswordSet) {
+        permissionsNote.innerHTML = `<strong>Permissions restricted:</strong> ${escapeHtml(formatDeniedList(denied))}. PDF readers enforce this for anyone opening with the open password; the owner password still grants full access.`;
+    } else {
+        permissionsNote.innerHTML = `<strong>Permissions restricted, but not enforceable:</strong> ${escapeHtml(formatDeniedList(denied))} marked as not allowed. Because no separate owner password was set, the open password also grants owner access, so readers will ignore the restrictions.`;
+    }
+
+    completionDetails.appendChild(permissionsNote);
 
     if (failed.length > 0) {
         const failedNote = document.createElement('div');
@@ -496,7 +598,8 @@ async function protectPDFs() {
                 const result = await encryptPDF(
                     sourceBytes.slice(),
                     options.openPassword,
-                    options.ownerPassword
+                    options.ownerPassword,
+                    options.permissions
                 );
 
                 const protectedBytes = result instanceof Uint8Array
@@ -538,7 +641,8 @@ async function protectPDFs() {
             inputTotal,
             outputTotal,
             totalPages,
-            ownerPasswordSet: Boolean(options.ownerPassword)
+            ownerPasswordSet: Boolean(options.ownerPassword),
+            deniedPermissions: options.deniedPermissions
         };
 
         renderCompletion();

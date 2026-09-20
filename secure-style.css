@@ -350,6 +350,34 @@
     accent-color: var(--accent-primary);
 }
 
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 20px;
+    margin: 12px 0;
+}
+
+.permissions-grid .checkbox-label {
+    align-items: flex-start;
+    line-height: 1.4;
+}
+
+.permissions-grid .checkbox-label input[type="checkbox"] {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.permissions-grid .checkbox-label.is-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .permissions-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .options-accordion {
     margin-bottom: 24px;
     overflow: hidden;

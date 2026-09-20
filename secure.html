@@ -137,6 +137,46 @@
                         </div>
 
                         <div class="option-group">
+                            <span class="input-label">Document permissions</span>
+                            <p class="input-hint">Uncheck what readers should not be allowed to do with the protected PDF.</p>
+                            <div class="permissions-grid">
+                                <label class="checkbox-label" for="permPrint">
+                                    <input type="checkbox" id="permPrint" checked>
+                                    <span>Printing</span>
+                                </label>
+                                <label class="checkbox-label" for="permPrintHighRes">
+                                    <input type="checkbox" id="permPrintHighRes" checked>
+                                    <span>High-quality printing</span>
+                                </label>
+                                <label class="checkbox-label" for="permCopy">
+                                    <input type="checkbox" id="permCopy" checked>
+                                    <span>Copying text and images</span>
+                                </label>
+                                <label class="checkbox-label" for="permModify">
+                                    <input type="checkbox" id="permModify" checked>
+                                    <span>Editing content</span>
+                                </label>
+                                <label class="checkbox-label" for="permAnnotate">
+                                    <input type="checkbox" id="permAnnotate" checked>
+                                    <span>Adding comments and annotations</span>
+                                </label>
+                                <label class="checkbox-label" for="permForms">
+                                    <input type="checkbox" id="permForms" checked>
+                                    <span>Filling in form fields</span>
+                                </label>
+                                <label class="checkbox-label" for="permAssemble">
+                                    <input type="checkbox" id="permAssemble" checked>
+                                    <span>Extracting, rotating, or reordering pages</span>
+                                </label>
+                                <label class="checkbox-label" for="permAccessibility">
+                                    <input type="checkbox" id="permAccessibility" checked>
+                                    <span>Screen reader access</span>
+                                </label>
+                            </div>
+                            <p class="input-hint" id="permissionsHint">Permissions are enforced by the PDF reader, not by encryption. They only apply to people who open the file with the open password &mdash; so set a <strong>separate owner password</strong> above, or anyone can simply grant themselves everything.</p>
+                        </div>
+
+                        <div class="option-group">
                             <label for="filenameSuffix" class="input-label">Output filename suffix</label>
                             <input type="text" id="filenameSuffix" class="text-input" value="protected" placeholder="protected">
                             <p class="input-hint">Example: <code>Report_protected.pdf</code></p>

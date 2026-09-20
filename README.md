@@ -15,7 +15,7 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 | **Merge** | Combine multiple PDFs into one, with optional page selection and drag-to-reorder |
 | **Split** | Extract pages, split by ranges, or split every N pages |
 | **Compress** | Smart JPEG image recompression (preserves text, vectors, forms, links), with optional destructive page-flatten fallback |
-| **Secure** | Add password protection and owner permissions to PDFs |
+| **Secure** | Add password protection, an optional separate owner password, and reader-enforced permissions (printing, copying, editing, annotating, forms, page assembly, accessibility) |
 | **PDF to Image** | Render PDF pages to JPG or PNG at configurable quality and scale |
 | **Image to PDF** | Combine JPG and PNG images into a single PDF with configurable page size and margins |
 
