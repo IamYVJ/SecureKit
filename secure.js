@@ -160,7 +160,7 @@ function resetSensitiveInputs() {
 
 async function loadSecurePdfModule() {
     if (!securePdfModulePromise) {
-        securePdfModulePromise = import('./lib/pdf-encrypt-lite.js')
+        securePdfModulePromise = import('./lib/pdf-aes256.js')
             .then((module) => {
                 if (typeof module.encryptPDF !== 'function') {
                     throw new Error('Secure PDF module loaded without encryption support.');

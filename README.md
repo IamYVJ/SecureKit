@@ -15,7 +15,7 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 | **Merge** | Combine multiple PDFs into one, with optional page selection and drag-to-reorder |
 | **Split** | Extract pages, split by ranges, or split every N pages |
 | **Compress** | Smart JPEG image recompression (preserves text, vectors, forms, links), with optional destructive page-flatten fallback |
-| **Secure** | Add password protection, an optional separate owner password, and reader-enforced permissions (printing, copying, editing, annotating, forms, page assembly, accessibility) |
+| **Secure** | Protect PDFs with AES-256 encryption, an optional separate owner password, and reader-enforced permissions (printing, copying, editing, annotating, forms, page assembly, accessibility) |
 | **PDF to Image** | Render PDF pages to JPG or PNG at configurable quality and scale |
 | **Image to PDF** | Combine JPG and PNG images into a single PDF with configurable page size and margins |
 
@@ -24,7 +24,7 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 ## Privacy guarantees
 
 - **No uploads.** No backend, no servers. Open DevTools → Network and you'll see zero requests during processing.
-- **No third-party CDNs at runtime.** All dependencies (`pdf-lib`, `pdf.js`, `pdf-encrypt-lite`) are vendored locally under `lib/`. The site can run completely air-gapped.
+- **No third-party CDNs at runtime.** All dependencies (`pdf-lib`, `pdf.js`, `JSZip`) are vendored locally under `lib/`, and encryption uses the browser's own Web Crypto API. The site can run completely air-gapped.
 - **Locked-down CSP.** Every page declares `script-src 'self'` — even if a future change accidentally tried to load remote code, the browser would block it.
 - **Service-worker-backed offline mode.** After your first visit, the entire app works without an internet connection.
 
@@ -57,8 +57,7 @@ SecureKit/
     ├── pdf-lib.min.js       # PDF reading / writing
     ├── pdf.min.js           # PDF rendering
     ├── pdf.worker.min.js    # PDF.js worker
-    ├── pdf-encrypt-lite.js  # Password encryption for Secure tool (locally patched)
-    ├── pdf-encrypt-crypto.js # MD5/RC4 helpers split out of that bundle
+    ├── pdf-aes256.js        # AES-256 (PDF 2.0) encryption for the Secure tool
     └── jszip.min.js         # ZIP archive packing for batch downloads
 ```
 
@@ -79,26 +78,36 @@ Any equivalent works: `npx serve`, `caddy file-server`, `php -S localhost:8000`,
 
 ## Updating vendored libraries
 
-The four bundles in `lib/` are pinned for reproducibility. To refresh:
+The vendored bundles in `lib/` are pinned for reproducibility (`pdf-aes256.js` is
+ours, not vendored). To refresh:
 
 ```bash
 cd lib
 curl -o pdf-lib.min.js     https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js
 curl -o pdf.min.js         https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js
 curl -o pdf.worker.min.js  https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js
-curl -L -o pdf-encrypt-lite.js  https://cdn.jsdelivr.net/npm/@pdfsmaller/pdf-encrypt-lite@1.0.0/+esm
 curl -o jszip.min.js       https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 ```
 
 After updating, bump `CACHE_VERSION` in `sw.js` so users get the new files instead of stale cached copies.
 
-> **`pdf-encrypt-lite.js` needs a local patch.** The jsDelivr `+esm` bundle is not
-> browser-loadable as published: it still contains top-level `require("pdf-lib")` and
-> `require("./crypto-minimal")` calls plus writes to a bare `exports`, so importing it
-> throws `ReferenceError: require is not defined`. Our copy fixes those three bindings
-> (pdf-lib comes from the global `PDFLib`, the crypto chunk lives in
-> `lib/pdf-encrypt-crypto.js`) and documents the change in its header. Re-downloading the
-> bundle reintroduces the bug — re-apply the patch and re-test the Secure tool.
+## Encryption
+
+The Secure tool writes **AES-256 encryption** (PDF 2.0 standard security handler,
+`/V 5 /R 6`) implemented in `lib/pdf-aes256.js` on top of the Web Crypto API:
+ISO 32000-2 algorithms 2.B, 8, 9 and 10, with streams and strings encrypted as
+AESV3 (AES-256-CBC, random IV per object).
+
+- Web Crypto is only exposed on secure origins, so the Secure tool needs
+  `https://` or `localhost` — the same requirement as the service worker.
+- Readers must support AES-256: Acrobat X (2010) and later, current Preview,
+  Chrome, Firefox, Edge and pdf.js. Acrobat 9 and older cannot open these files.
+- Permission flags (`/P`) are enforced by the reader, not by cryptography, and
+  only bind users who open with the user password — set a separate owner
+  password for them to mean anything.
+
+Earlier versions used a vendored RC4 128-bit library; it was removed in favour of
+this module.
 
 ---
 
@@ -106,7 +115,7 @@ After updating, bump `CACHE_VERSION` in `sw.js` so users get the new files inste
 
 - [pdf-lib](https://pdf-lib.js.org/) — MIT — PDF creation and modification
 - [PDF.js](https://mozilla.github.io/pdf.js/) — Apache 2.0 — PDF rendering
-- [@pdfsmaller/pdf-encrypt-lite](https://www.npmjs.com/package/@pdfsmaller/pdf-encrypt-lite) — PDF password encryption
+- `lib/pdf-aes256.js` — first-party; implements ISO 32000-2 AES-256 encryption on top of the Web Crypto API
 - [JSZip](https://stuk.github.io/jszip/) — MIT — ZIP archive creation for batch downloads
 
 ---

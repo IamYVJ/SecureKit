@@ -2,7 +2,7 @@
 // Caches every static asset so the app works offline after first visit.
 // Bump CACHE_VERSION when you update any vendored library or shipped file.
 
-const CACHE_VERSION = 'securekit-v4';
+const CACHE_VERSION = 'securekit-v5';
 
 const PRECACHE_URLS = [
     './',
@@ -34,8 +34,7 @@ const PRECACHE_URLS = [
     'lib/pdf-lib.min.js',
     'lib/pdf.min.js',
     'lib/pdf.worker.min.js',
-    'lib/pdf-encrypt-lite.js',
-    'lib/pdf-encrypt-crypto.js',
+    'lib/pdf-aes256.js',
     'lib/jszip.min.js'
 ];
 
