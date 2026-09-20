@@ -57,7 +57,8 @@ SecureKit/
     ├── pdf-lib.min.js       # PDF reading / writing
     ├── pdf.min.js           # PDF rendering
     ├── pdf.worker.min.js    # PDF.js worker
-    ├── pdf-encrypt-lite.js  # Password encryption for Secure tool
+    ├── pdf-encrypt-lite.js  # Password encryption for Secure tool (locally patched)
+    ├── pdf-encrypt-crypto.js # MD5/RC4 helpers split out of that bundle
     └── jszip.min.js         # ZIP archive packing for batch downloads
 ```
 
@@ -90,6 +91,14 @@ curl -o jszip.min.js       https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/j
 ```
 
 After updating, bump `CACHE_VERSION` in `sw.js` so users get the new files instead of stale cached copies.
+
+> **`pdf-encrypt-lite.js` needs a local patch.** The jsDelivr `+esm` bundle is not
+> browser-loadable as published: it still contains top-level `require("pdf-lib")` and
+> `require("./crypto-minimal")` calls plus writes to a bare `exports`, so importing it
+> throws `ReferenceError: require is not defined`. Our copy fixes those three bindings
+> (pdf-lib comes from the global `PDFLib`, the crypto chunk lives in
+> `lib/pdf-encrypt-crypto.js`) and documents the change in its header. Re-downloading the
+> bundle reintroduces the bug — re-apply the patch and re-test the Secure tool.
 
 ---
 

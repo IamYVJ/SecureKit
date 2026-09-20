@@ -35,6 +35,7 @@ const PRECACHE_URLS = [
     'lib/pdf.min.js',
     'lib/pdf.worker.min.js',
     'lib/pdf-encrypt-lite.js',
+    'lib/pdf-encrypt-crypto.js',
     'lib/jszip.min.js'
 ];
 
