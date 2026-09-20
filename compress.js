@@ -35,6 +35,18 @@ const SMART_RECOMPRESS_CUSTOM_ATTEMPTS = [
 
 const MAX_RENDER_PIXELS = 8_000_000;
 
+// Page-flattening is destructive: searchable text, links, and form fields do not survive it.
+// Each preset decides when it is allowed to win over the non-destructive passes.
+const FLATTEN_POLICY = {
+    low: 'never',
+    medium: 'if-needed',
+    high: 'if-smaller'
+};
+
+// For the 'if-needed' policy: how much the non-destructive passes must save before
+// flattening is considered unnecessary.
+const MEANINGFUL_SAVINGS_RATIO = 0.1;
+
 let selectedFiles = [];
 let isProcessing = false;
 let workflowStage = 'setup';
@@ -792,6 +804,22 @@ function chooseSmallerResult(currentBest, candidate) {
     return currentBest;
 }
 
+function shouldAttemptFlatten(policy, originalSize, preservedSize) {
+    if (policy === 'never') {
+        return false;
+    }
+
+    if (policy === 'if-smaller') {
+        return true;
+    }
+
+    const savedRatio = originalSize > 0
+        ? (originalSize - preservedSize) / originalSize
+        : 0;
+
+    return savedRatio < MEANINGFUL_SAVINGS_RATIO;
+}
+
 function chooseBestTargetResult(currentBest, candidate) {
     if (!candidate || !candidate.targetMet || !candidate.bytes || candidate.bytes.length === 0) {
         return currentBest;
@@ -837,6 +865,10 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
     let bestTargetResult = isTargetMode
         ? chooseBestTargetResult(null, bestResult)
         : null;
+    let bestFlattenedResult = null;
+    const flattenPolicy = isTargetMode
+        ? 'if-smaller'
+        : (FLATTEN_POLICY[compressionLevel] || 'if-needed');
 
     if (isTargetMode && bestTargetResult && !bestTargetResult.flattened) {
         return bestTargetResult;
@@ -856,7 +888,10 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
             };
 
             bestResult = chooseSmallerResult(bestResult, structuralCandidate);
-            bestTargetResult = chooseBestTargetResult(bestTargetResult, structuralCandidate);
+
+            if (isTargetMode) {
+                bestTargetResult = chooseBestTargetResult(bestTargetResult, structuralCandidate);
+            }
 
             if (isTargetMode && bestTargetResult && !bestTargetResult.flattened) {
                 return bestTargetResult;
@@ -907,7 +942,10 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
             };
 
             bestResult = chooseSmallerResult(bestResult, candidate);
-            bestTargetResult = chooseBestTargetResult(bestTargetResult, candidate);
+
+            if (isTargetMode) {
+                bestTargetResult = chooseBestTargetResult(bestTargetResult, candidate);
+            }
 
             if (isTargetMode && bestTargetResult && !bestTargetResult.flattened && bestTargetResult.targetMet) {
                 return bestTargetResult;
@@ -920,6 +958,10 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
             console.warn('Smart image recompression failed for', fileData.name, error);
             break;
         }
+    }
+
+    if (!shouldAttemptFlatten(flattenPolicy, originalBytes.length, bestResult.bytes.length)) {
+        return bestResult;
     }
 
     const imageAttempts = compressionLevel === 'custom'
@@ -955,8 +997,11 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
                 targetMet: targetSizeBytes ? candidateBytes.length <= targetSizeBytes : true
             };
 
-            bestResult = chooseSmallerResult(bestResult, candidate);
-            bestTargetResult = chooseBestTargetResult(bestTargetResult, candidate);
+            bestFlattenedResult = chooseSmallerResult(bestFlattenedResult, candidate);
+
+            if (isTargetMode) {
+                bestTargetResult = chooseBestTargetResult(bestTargetResult, candidate);
+            }
 
             if (isTargetMode && candidate.targetMet) {
                 const refinedAttempts = buildRefinedCustomAttempts(previousOversizedAttempt, attempt);
@@ -982,7 +1027,7 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
                         targetMet: refinedBytes.length <= targetSizeBytes
                     };
 
-                    bestResult = chooseSmallerResult(bestResult, refinedCandidate);
+                    bestFlattenedResult = chooseSmallerResult(bestFlattenedResult, refinedCandidate);
                     bestTargetResult = chooseBestTargetResult(bestTargetResult, refinedCandidate);
                 }
 
@@ -1003,7 +1048,11 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
         }
     }
 
-    return bestTargetResult || bestResult;
+    if (isTargetMode) {
+        return bestTargetResult || chooseSmallerResult(bestResult, bestFlattenedResult);
+    }
+
+    return chooseSmallerResult(bestResult, bestFlattenedResult);
 }
 
 async function compressPDFs() {

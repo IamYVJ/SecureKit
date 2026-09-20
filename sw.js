@@ -2,7 +2,7 @@
 // Caches every static asset so the app works offline after first visit.
 // Bump CACHE_VERSION when you update any vendored library or shipped file.
 
-const CACHE_VERSION = 'securekit-v2';
+const CACHE_VERSION = 'securekit-v3';
 
 const PRECACHE_URLS = [
     './',
