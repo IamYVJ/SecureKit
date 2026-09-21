@@ -38,6 +38,7 @@ const openPasswordInput = document.getElementById('openPassword');
 const confirmPasswordInput = document.getElementById('confirmPassword');
 const ownerPasswordInput = document.getElementById('ownerPassword');
 const filenameSuffixInput = document.getElementById('filenameSuffix');
+const downloadModeSelect = document.getElementById('downloadMode');
 const showPasswordsCheckbox = document.getElementById('showPasswords');
 const permissionInputs = new Map(
     PERMISSION_BITS.map((entry) => [entry.id, document.getElementById(entry.id)])
@@ -667,6 +668,27 @@ async function saveProtectedFiles() {
     try {
         if (!lastProtectionResult?.files?.length) {
             showWarningMessage('No protected files are ready to save yet.');
+            return;
+        }
+
+        const mode = downloadModeSelect?.value || 'zip';
+
+        // One file is a plain download whichever mode is selected - zipping a
+        // single PDF only adds a step for the user.
+        if (mode === 'zip' && lastProtectionResult.files.length > 1) {
+            const archiveBase = sanitizeFilename(getDefaultFilename('ProtectedPDFs'));
+            const result = await downloadAsZip(
+                lastProtectionResult.files.map((file) => ({
+                    filename: file.filename.endsWith('.pdf') ? file.filename : `${file.filename}.pdf`,
+                    bytes: file.bytes
+                })),
+                archiveBase
+            );
+
+            if (result.failed > 0) {
+                showWarningMessage(`Archive ready, but ${result.failed} file${result.failed !== 1 ? 's' : ''} could not be added.`);
+            }
+
             return;
         }
 

@@ -66,6 +66,10 @@ const compressButton = document.getElementById('compressButton');
 const processingSection = document.getElementById('processingSection');
 const targetSize = document.getElementById('targetSize');
 const sizeUnit = document.getElementById('sizeUnit');
+const downloadModeSelect = document.getElementById('downloadMode');
+const filenameSuffixInput = document.getElementById('filenameSuffix');
+const accordionToggle = document.getElementById('accordionToggle');
+const accordionContent = document.getElementById('accordionContent');
 const processingTitle = document.getElementById('processingTitle');
 const processingMessage = document.getElementById('processingMessage');
 const progressInfo = document.getElementById('progressInfo');
@@ -109,6 +113,10 @@ try {
     setupRadioButtons('compressionLevel', (e) => {
         handleRadioToggle(e, '.option-input-wrapper');
     });
+
+    if (accordionToggle && accordionContent) {
+        setupAccordion(accordionToggle, accordionContent);
+    }
 } catch (error) {
     console.error('Error setting up event listeners:', error);
     showErrorMessage('Failed to initialize the compression tool. Please refresh the page.');
@@ -129,7 +137,7 @@ function base64ToUint8Array(base64) {
     return bytes;
 }
 
-function importPendingCompressionFile() {
+async function importPendingCompressionFile() {
     try {
         const rawPayload = sessionStorage.getItem(PENDING_COMPRESS_STORAGE_KEY);
         if (!rawPayload) {
@@ -147,7 +155,7 @@ function importPendingCompressionFile() {
             type: payload.mimeType || 'application/pdf'
         });
 
-        addFiles([file]);
+        await addFiles([file]);
         showSuccessMessage(`Loaded "${payload.filename}" from the merge tool. Ready to compress.`);
     } catch (error) {
         console.error('Error importing pending compression file:', error);
@@ -158,7 +166,7 @@ function importPendingCompressionFile() {
 
 importPendingCompressionFile();
 
-function handleFileSelect(e) {
+async function handleFileSelect(e) {
     try {
         if (isProcessing) {
             showWarningMessage('Please wait for the current operation to complete.');
@@ -166,7 +174,7 @@ function handleFileSelect(e) {
         }
 
         const files = Array.from(e.target.files);
-        addFiles(files);
+        await addFiles(files);
         fileInput.value = '';
     } catch (error) {
         console.error('Error in handleFileSelect:', error);
@@ -175,26 +183,57 @@ function handleFileSelect(e) {
     }
 }
 
-function addFiles(files) {
+async function addFiles(files) {
     try {
         if (!Array.isArray(files) || files.length === 0) {
             return;
         }
 
+        const potentialTotal = [
+            ...selectedFiles,
+            ...files.map((file) => ({ size: file.size }))
+        ];
+
+        const totalValidation = validateTotalSize(potentialTotal);
+        if (!totalValidation.valid) {
+            showErrorMessage(totalValidation.error);
+            return;
+        }
+
+        // Compression renders pages to canvas and keeps several candidate PDFs
+        // in memory at once, so check the headroom before accepting the files.
+        const memoryCheck = checkAvailableMemory(estimateMemoryUsage(totalValidation.totalSize));
+        if (!memoryCheck.hasEnough) {
+            showErrorMessage(memoryCheck.warning || 'Insufficient memory to process these files.');
+            return;
+        }
+
+        if (memoryCheck.warning) {
+            showWarningMessage(memoryCheck.warning);
+        }
+
         const validFiles = [];
         const errors = [];
 
-        files.forEach((file) => {
+        for (const file of files) {
             try {
                 if (!isPDF(file)) {
                     errors.push(`"${file.name}" is not a PDF file`);
-                    return;
+                    continue;
                 }
 
                 const validation = validateFileSize(file, true);
                 if (!validation.valid) {
                     errors.push(validation.error);
-                    return;
+                    continue;
+                }
+
+                // Catch encrypted or damaged PDFs here rather than part-way
+                // through a long compression run.
+                const loaded = await loadPDFWithValidation(file);
+                if (loaded.error) {
+                    errors.push(`"${file.name}": ${loaded.error}`);
+                    continue;
                 }
 
                 validFiles.push({
@@ -202,7 +241,8 @@ function addFiles(files) {
                     file: file,
                     name: file.name,
                     size: file.size,
-                    sizeFormatted: formatFileSize(file.size)
+                    sizeFormatted: formatFileSize(file.size),
+                    pageCount: loaded.pageCount
                 });
 
                 if (validation.warning) {
@@ -212,7 +252,7 @@ function addFiles(files) {
                 console.error('Error validating file:', file.name, error);
                 errors.push(`Error validating "${file.name}"`);
             }
-        });
+        }
 
         if (errors.length > 0) {
             showErrorMessage(errors.join('\n'));
@@ -291,7 +331,7 @@ function renderFilesList() {
                         <div class="file-name">${escapeHtml(fileData.name)}</div>
                         <div class="file-size">${fileData.sizeFormatted}</div>
                     </div>
-                    <button class="remove-file" data-index="${index}">
+                    <button class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(fileData.name)}">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -440,14 +480,33 @@ async function saveCompressionResults() {
         return;
     }
 
+    const items = lastCompressionResult.files.map((item) => ({
+        bytes: item.bytes,
+        filename: item.filename
+    }));
+    const mode = downloadModeSelect?.value || 'zip';
+
     try {
-        const results = await downloadMultiplePDFs(
-            lastCompressionResult.files.map((item) => ({
-                bytes: item.bytes,
-                filename: item.filename
-            })),
-            120
-        );
+        // One file is a plain download whichever mode is selected - zipping a
+        // single PDF only adds a step for the user.
+        if (mode === 'zip' && items.length > 1) {
+            const archiveBase = sanitizeFilename(getDefaultFilename('CompressedPDFs'));
+            const result = await downloadAsZip(
+                items.map((item) => ({
+                    filename: item.filename.endsWith('.pdf') ? item.filename : `${item.filename}.pdf`,
+                    bytes: item.bytes
+                })),
+                archiveBase
+            );
+
+            if (result.failed > 0) {
+                showWarningMessage(`Archive ready, but ${result.failed} file${result.failed !== 1 ? 's' : ''} could not be added.`);
+            }
+
+            return;
+        }
+
+        const results = await downloadMultiplePDFs(items, 120);
 
         if (results.failed > 0) {
             showWarningMessage(`Started saving compressed files, but ${results.failed} download${results.failed !== 1 ? 's' : ''} failed.`);
@@ -792,6 +851,18 @@ function buildPresetImageAttempts(level) {
     }));
 }
 
+function getFilenameSuffix() {
+    return sanitizeFilename(filenameSuffixInput?.value?.trim() || '') || 'compressed';
+}
+
+function buildCompressedFilename(originalName, suffix) {
+    const baseName = originalName.toLowerCase().endsWith('.pdf')
+        ? originalName.slice(0, -4)
+        : originalName;
+
+    return `${sanitizeFilename(baseName) || 'document'}_${suffix}`;
+}
+
 function chooseSmallerResult(currentBest, candidate) {
     if (!candidate || !candidate.bytes || candidate.bytes.length === 0) {
         return currentBest;
@@ -1128,7 +1199,7 @@ async function compressPDFs() {
                 const reduction = originalSize > 0
                     ? ((originalSize - compressedSize) / originalSize * 100).toFixed(1)
                     : '0.0';
-                const baseName = fileData.name.replace(/\.pdf$/i, '');
+                const outputFilename = buildCompressedFilename(fileData.name, getFilenameSuffix());
 
                 if (result.flattened) {
                     flattenedCount++;
@@ -1143,7 +1214,7 @@ async function compressPDFs() {
 
                 successfulCompressions.push({
                     bytes: result.bytes,
-                    filename: `${baseName}_compressed`,
+                    filename: outputFilename,
                     originalSize: originalSize,
                     compressedSize: compressedSize,
                     reduction: reduction,

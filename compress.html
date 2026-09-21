@@ -18,6 +18,7 @@
     <title>Compress PDF - SecureKit</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="compress-style.css">
+    <link rel="stylesheet" href="validation-styles.css">
 </head>
 <body>
     <div class="grain-overlay"></div>
@@ -151,6 +152,37 @@
                 <div class="compression-notice">
                     <h4>How it works</h4>
                     <p>SecureKit first tries <strong>smart image recompression</strong> — re-encoding embedded JPEGs while keeping all text, vectors, forms, and links intact. Only when a smaller target requires it does it fall back to <strong>page-flattening</strong>, which renders pages to images and may drop searchable text and interactive elements.</p>
+                </div>
+
+                <div class="options-accordion">
+                    <button class="accordion-header" id="accordionToggle">
+                        <span class="accordion-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Additional Options
+                        </span>
+                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+
+                    <div class="accordion-content" id="accordionContent">
+                        <div class="option-group">
+                            <label for="downloadMode" class="input-label">Download as</label>
+                            <select id="downloadMode" class="text-input">
+                                <option value="zip" selected>Single ZIP archive (recommended)</option>
+                                <option value="individual">Individual files</option>
+                            </select>
+                            <p class="input-hint">ZIP delivers every compressed file in one download. Individual files trigger one download per file &mdash; your browser may ask permission or block the extras.</p>
+                        </div>
+
+                        <div class="option-group">
+                            <label for="filenameSuffix" class="input-label">Output filename suffix</label>
+                            <input type="text" id="filenameSuffix" class="text-input" value="compressed" placeholder="compressed">
+                            <p class="input-hint">Example: <code>Report_compressed.pdf</code></p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="action-buttons">
@@ -296,6 +328,7 @@
 
     <script src="lib/pdf-lib.min.js"></script>
     <script src="lib/pdf.min.js"></script>
+    <script src="lib/jszip.min.js"></script>
     <script src="shared-utils.js"></script>
     <script src="file-size-validation.js"></script>
     <script src="compress.js"></script>

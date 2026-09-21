@@ -177,6 +177,15 @@
                         </div>
 
                         <div class="option-group">
+                            <label for="downloadMode" class="input-label">Download as</label>
+                            <select id="downloadMode" class="text-input">
+                                <option value="zip" selected>Single ZIP archive (recommended)</option>
+                                <option value="individual">Individual files</option>
+                            </select>
+                            <p class="input-hint">ZIP delivers every protected file in one download. Individual files trigger one download per file &mdash; your browser may ask permission or block the extras.</p>
+                        </div>
+
+                        <div class="option-group">
                             <label for="filenameSuffix" class="input-label">Output filename suffix</label>
                             <input type="text" id="filenameSuffix" class="text-input" value="protected" placeholder="protected">
                             <p class="input-hint">Example: <code>Report_protected.pdf</code></p>
@@ -330,6 +339,7 @@
     </footer>
 
     <script src="lib/pdf-lib.min.js"></script>
+    <script src="lib/jszip.min.js"></script>
     <script src="shared-utils.js"></script>
     <script src="file-size-validation.js"></script>
     <script src="secure.js"></script>
