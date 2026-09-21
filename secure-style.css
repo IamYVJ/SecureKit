@@ -432,6 +432,46 @@
     padding: 0 24px 24px;
 }
 
+/* The class sets display, so the hidden attribute needs to win explicitly. */
+.security-alert[hidden] {
+    display: none;
+}
+
+.security-alert {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background-color: rgba(255, 92, 92, 0.08);
+    border: 1px solid rgba(255, 92, 92, 0.45);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    color: var(--text-secondary);
+}
+
+.security-alert svg {
+    color: #ff5c5c;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.security-alert h4 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #ff5c5c;
+    margin-bottom: 8px;
+}
+
+.security-alert p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.security-alert .security-alert-note {
+    margin-top: 6px;
+    color: var(--text-muted);
+}
+
 .security-notice {
     background-color: rgba(255, 152, 0, 0.08);
     border: 1px solid rgba(255, 152, 0, 0.45);

@@ -8,6 +8,7 @@ let isProcessing = false;
 let workflowStage = 'setup';
 let lastProtectionResult = null;
 let securePdfModulePromise = null;
+let encryptionUnavailableReason = null;
 let cancellation = null;
 let resetStopButton = () => {};
 
@@ -63,6 +64,8 @@ const saveButton = document.getElementById('saveButton');
 const anotherButton = document.getElementById('anotherButton');
 const infoSection = document.querySelector('.info-section');
 const stopButton = document.getElementById('stopButton');
+const insecureContextAlert = document.getElementById('insecureContextAlert');
+const insecureContextMessage = document.getElementById('insecureContextMessage');
 const accordionToggle = document.getElementById('accordionToggle');
 const accordionContent = document.getElementById('accordionContent');
 
@@ -98,6 +101,58 @@ try {
 setupDragAndDrop(uploadArea, (files) => {
     addFiles(files);
 }, { allowMultiple: true });
+
+/**
+ * AES-256 encryption runs on the Web Crypto API, which browsers only expose to
+ * secure origins. Detect that at load so people are told up front instead of
+ * after picking files and typing a password.
+ */
+function checkEncryptionAvailability() {
+    if (globalThis.crypto?.subtle) {
+        return null;
+    }
+
+    if (window.isSecureContext === false) {
+        const origin = window.location.protocol === 'file:'
+            ? 'a local file'
+            : window.location.origin;
+
+        return `This page is served from ${origin}, and browsers only provide the `
+            + 'encryption API SecureKit needs on a secure origin. Open it over '
+            + '<strong>https://</strong> or <strong>http://localhost</strong> to protect PDFs.';
+    }
+
+    return 'This browser does not provide the Web Crypto API that AES-256 encryption '
+        + 'needs. Please try a current version of Chrome, Edge, Firefox or Safari.';
+}
+
+function applyEncryptionAvailability() {
+    encryptionUnavailableReason = checkEncryptionAvailability();
+
+    if (!encryptionUnavailableReason) {
+        return;
+    }
+
+    if (insecureContextMessage) {
+        insecureContextMessage.innerHTML = encryptionUnavailableReason;
+    }
+
+    if (insecureContextAlert) {
+        insecureContextAlert.hidden = false;
+    }
+
+    if (protectButton) {
+        protectButton.disabled = true;
+        protectButton.setAttribute('aria-disabled', 'true');
+    }
+}
+
+applyEncryptionAvailability();
+
+// The banner carries <strong> markup; toasts are plain text.
+function stripMarkup(html) {
+    return html.replace(/<[^>]*>/g, '');
+}
 
 function updatePasswordVisibility() {
     const inputType = showPasswordsCheckbox?.checked ? 'text' : 'password';
@@ -558,6 +613,13 @@ async function protectPDFs() {
     try {
         if (isProcessing) {
             showWarningMessage('Protection is already in progress. Please wait.');
+            return;
+        }
+
+        // Belt and braces: the button is already disabled, but the run must
+        // not start even if something re-enables it.
+        if (encryptionUnavailableReason) {
+            showErrorMessage(stripMarkup(encryptionUnavailableReason));
             return;
         }
 

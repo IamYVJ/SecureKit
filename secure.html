@@ -62,6 +62,17 @@
                 </div>
             </div>
 
+            <div class="security-alert" id="insecureContextAlert" role="alert" hidden>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div>
+                    <h4>Password protection is unavailable on this connection</h4>
+                    <p id="insecureContextMessage">Browsers only provide the encryption API SecureKit needs on a secure origin. Open this page over <strong>https://</strong> or <strong>http://localhost</strong> to protect PDFs.</p>
+                    <p class="security-alert-note">The other SecureKit tools work normally here.</p>
+                </div>
+            </div>
+
             <div class="upload-section" id="uploadSection">
                 <div class="upload-area" id="uploadArea">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" class="upload-icon">
