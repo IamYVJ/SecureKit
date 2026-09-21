@@ -8,6 +8,8 @@ let isProcessing = false;
 let workflowStage = 'setup';
 let lastProtectionResult = null;
 let securePdfModulePromise = null;
+let cancellation = null;
+let resetStopButton = () => {};
 
 // PDF 1.7, Table 22: the /P bitmask. A set bit allows the action; bits not listed
 // here are reserved and fixed by the encryption library. "All allowed" is the
@@ -60,6 +62,7 @@ const completionDetails = document.getElementById('completionDetails');
 const saveButton = document.getElementById('saveButton');
 const anotherButton = document.getElementById('anotherButton');
 const infoSection = document.querySelector('.info-section');
+const stopButton = document.getElementById('stopButton');
 const accordionToggle = document.getElementById('accordionToggle');
 const accordionContent = document.getElementById('accordionContent');
 
@@ -85,6 +88,8 @@ try {
     if (accordionToggle && accordionContent) {
         setupAccordion(accordionToggle, accordionContent);
     }
+
+    resetStopButton = setupStopButton(stopButton, () => cancellation?.cancel());
 } catch (error) {
     console.error('Error setting up event listeners:', error);
     showErrorMessage('Failed to initialize the Secure PDF tool. Please refresh the page.');
@@ -567,6 +572,7 @@ async function protectPDFs() {
         }
 
         isProcessing = true;
+        cancellation = createCancellation();
         lastProtectionResult = null;
         setProcessingState(true, protectButton, null, 'Protect PDFs', 'Protecting...');
         processingTitle.textContent = selectedFiles.length === 1 ? 'Protecting 1 PDF' : `Protecting ${selectedFiles.length} PDFs`;
@@ -584,6 +590,8 @@ async function protectPDFs() {
         let totalPages = 0;
 
         for (let index = 0; index < selectedFiles.length; index++) {
+            cancellation.throwIfCancelled();
+
             const item = selectedFiles[index];
 
             currentFile.textContent = String(index + 1);
@@ -655,11 +663,18 @@ async function protectPDFs() {
             showSuccessMessage(`Protected ${protectedFiles.length} file${protectedFiles.length === 1 ? '' : 's'} successfully.`);
         }
     } catch (error) {
+        if (isCancellation(error)) {
+            showWarningMessage('Cancelled. Nothing was protected, and your files are still listed.');
+            setWorkflowStage('setup');
+            return;
+        }
         console.error('Error in protectPDFs:', error);
         showErrorMessage(error.message || 'An error occurred while protecting PDFs. Please try again.');
         setWorkflowStage('setup');
     } finally {
         isProcessing = false;
+        cancellation = null;
+        resetStopButton();
         setProcessingState(false, protectButton, null, 'Protect PDFs', 'Protecting...');
     }
 }

@@ -10,6 +10,8 @@ const { PDFDocument } = PDFLib;
 let selectedFiles = [];
 let draggedElement = null;
 let isProcessing = false;
+let cancellation = null;
+let resetStopButton = () => {};
 let workflowStage = 'setup';
 let lastMergeResult = null;
 const PENDING_COMPRESS_STORAGE_KEY = 'securekit.pendingCompressFile';
@@ -25,6 +27,7 @@ const fileCount = document.getElementById('fileCount');
 const addMoreButton = document.getElementById('addMoreButton');
 const clearButton = document.getElementById('clearButton');
 const mergeButton = document.getElementById('mergeButton');
+const stopButton = document.getElementById('stopButton');
 const processingSection = document.getElementById('processingSection');
 const processingTitle = document.getElementById('processingTitle');
 const processingMessage = document.getElementById('processingMessage');
@@ -96,6 +99,7 @@ try {
 
     clearButton?.addEventListener('click', clearAllFiles);
     mergeButton?.addEventListener('click', mergePDFs);
+    resetStopButton = setupStopButton(stopButton, () => cancellation?.cancel());
     saveButton?.addEventListener('click', saveMergedResult);
     compressMergedButton?.addEventListener('click', compressMergedResult);
     anotherButton?.addEventListener('click', startAnotherMerge);
@@ -669,6 +673,7 @@ async function mergePDFs() {
         }
 
         isProcessing = true;
+        cancellation = createCancellation();
         setProcessingState(true, mergeButton, null, 'Merge PDFs', 'Merging...');
         resetProgress();
         setWorkflowStage('processing');
@@ -679,6 +684,8 @@ async function mergePDFs() {
         const mergedSourceFiles = [];
 
         for (let i = 0; i < selectedFiles.length; i++) {
+            cancellation.throwIfCancelled();
+
             try {
                 const fileData = selectedFiles[i];
                 updateProgress(
@@ -769,11 +776,19 @@ async function mergePDFs() {
         });
 
     } catch (error) {
+        if (isCancellation(error)) {
+            showWarningMessage('Cancelled. Nothing was merged, and your files are still listed.');
+            setWorkflowStage('setup');
+            return;
+        }
+
         console.error('Error merging PDFs:', error);
         showErrorMessage(error.message || 'An error occurred while merging PDFs. Please try again.');
         setWorkflowStage('setup');
     } finally {
         isProcessing = false;
+        cancellation = null;
+        resetStopButton();
         setProcessingState(false, mergeButton, null, 'Merge PDFs', 'Merging...');
         resetProgress();
     }

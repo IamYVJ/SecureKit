@@ -8,6 +8,8 @@ const { PDFDocument } = PDFLib;
 let selectedFile = null;
 let pdfDoc = null;
 let isProcessing = false;
+let cancellation = null;
+let resetStopButton = () => {};
 let workflowStage = 'setup';
 let lastSplitResult = null;
 
@@ -19,6 +21,7 @@ const fileSection = document.getElementById('fileSection');
 const fileDisplay = document.getElementById('fileDisplay');
 const removeButton = document.getElementById('removeButton');
 const cancelButton = document.getElementById('cancelButton');
+const stopButton = document.getElementById('stopButton');
 const splitButton = document.getElementById('splitButton');
 const processingSection = document.getElementById('processingSection');
 const processingTitle = document.getElementById('processingTitle');
@@ -64,6 +67,7 @@ try {
     fileInput?.addEventListener('change', handleFileSelect);
     removeButton?.addEventListener('click', removeFile);
     cancelButton?.addEventListener('click', removeFile);
+    resetStopButton = setupStopButton(stopButton, () => cancellation?.cancel());
     splitButton?.addEventListener('click', splitPDF);
     saveButton?.addEventListener('click', saveSplitResults);
     anotherButton?.addEventListener('click', startAnotherSplit);
@@ -405,6 +409,7 @@ async function splitPDF() {
         }
 
         isProcessing = true;
+        cancellation = createCancellation();
         setProcessingState(true, splitButton, null, 'Split PDF', 'Splitting...');
         resetProgress();
         setWorkflowStage('processing');
@@ -503,6 +508,8 @@ async function splitPDF() {
         };
 
         for (let i = 0; i < splits.length; i++) {
+            cancellation.throwIfCancelled();
+
             const split = splits[i];
 
             try {
@@ -547,11 +554,19 @@ async function splitPDF() {
             modeLabel: modeLabels[splitMode] || 'Selected Split Mode'
         });
     } catch (error) {
+        if (isCancellation(error)) {
+            showWarningMessage('Cancelled. No split files were created.');
+            setWorkflowStage('setup');
+            return;
+        }
+
         console.error('Error splitting PDF:', error);
         showErrorMessage(error.message || 'An error occurred while splitting the PDF. Please try again.');
         setWorkflowStage('setup');
     } finally {
         isProcessing = false;
+        cancellation = null;
+        resetStopButton();
         setProcessingState(false, splitButton, null, 'Split PDF', 'Splitting...');
         resetProgress();
     }

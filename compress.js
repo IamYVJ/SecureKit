@@ -51,6 +51,9 @@ let selectedFiles = [];
 let isProcessing = false;
 let workflowStage = 'setup';
 let lastCompressionResult = null;
+let cancellation = null;
+let activeRenderTask = null;
+let resetStopButton = () => {};
 const PENDING_COMPRESS_STORAGE_KEY = 'securekit.pendingCompressFile';
 
 const uploadArea = document.getElementById('uploadArea');
@@ -68,6 +71,7 @@ const targetSize = document.getElementById('targetSize');
 const sizeUnit = document.getElementById('sizeUnit');
 const downloadModeSelect = document.getElementById('downloadMode');
 const filenameSuffixInput = document.getElementById('filenameSuffix');
+const stopButton = document.getElementById('stopButton');
 const accordionToggle = document.getElementById('accordionToggle');
 const accordionContent = document.getElementById('accordionContent');
 const processingTitle = document.getElementById('processingTitle');
@@ -117,6 +121,13 @@ try {
     if (accordionToggle && accordionContent) {
         setupAccordion(accordionToggle, accordionContent);
     }
+
+    resetStopButton = setupStopButton(stopButton, () => {
+        cancellation?.cancel();
+        // The flatten pass renders whole pages; aborting the current one keeps
+        // Cancel responsive on large documents.
+        activeRenderTask?.cancel();
+    });
 } catch (error) {
     console.error('Error setting up event listeners:', error);
     showErrorMessage('Failed to initialize the compression tool. Please refresh the page.');
@@ -643,6 +654,8 @@ async function recompressEmbeddedImages(arrayBuffer, options, fileIndex, totalCo
     let savedBytes = 0;
 
     for (let i = 0; i < imageStreams.length; i++) {
+        cancellation?.throwIfCancelled();
+
         const [ref, obj] = imageStreams[i];
 
         updateProgress(
@@ -660,6 +673,10 @@ async function recompressEmbeddedImages(arrayBuffer, options, fileIndex, totalCo
                 savedBytes += result.originalSize - result.newSize;
             }
         } catch (e) {
+            if (isCancellation(e)) {
+                throw e;
+            }
+
             console.warn('Image recompress skipped:', e.message);
         }
 
@@ -726,6 +743,8 @@ async function createImageCompressedPdf(pdfJsDoc, imageSettings, fileIndex, tota
     const outputPdf = await PDFDocument.create();
 
     for (let pageNumber = 1; pageNumber <= pdfJsDoc.numPages; pageNumber++) {
+        cancellation?.throwIfCancelled();
+
         const page = await pdfJsDoc.getPage(pageNumber);
         const baseViewport = page.getViewport({ scale: 1 });
         const renderScale = clampRenderScale(baseViewport, imageSettings.renderScale);
@@ -749,10 +768,21 @@ async function createImageCompressedPdf(pdfJsDoc, imageSettings, fileIndex, tota
             `JPEG quality ${Math.round(imageSettings.jpegQuality * 100)}% at ${renderScale.toFixed(2)}x scale`
         );
 
-        await page.render({
+        const renderTask = page.render({
             canvasContext: context,
             viewport: renderViewport
-        }).promise;
+        });
+        activeRenderTask = renderTask;
+
+        try {
+            await renderTask.promise;
+        } catch (error) {
+            // An aborted render means the user cancelled - report it as such.
+            cancellation?.throwIfCancelled();
+            throw error;
+        } finally {
+            activeRenderTask = null;
+        }
 
         const jpgBytes = await canvasToJpegBytes(canvas, imageSettings.jpegQuality);
         const embeddedImage = await outputPdf.embedJpg(jpgBytes);
@@ -973,6 +1003,10 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
             }
         }
     } catch (error) {
+        if (isCancellation(error)) {
+            throw error;
+        }
+
         console.warn('Structural optimization failed for', fileData.name, error);
     }
 
@@ -981,6 +1015,8 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
         : (SMART_RECOMPRESS_PRESETS[compressionLevel] || SMART_RECOMPRESS_PRESETS.medium);
 
     for (const smart of smartAttempts) {
+        cancellation?.throwIfCancelled();
+
         try {
             updateProgress(
                 fileIndex,
@@ -1026,6 +1062,10 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
                 return candidate;
             }
         } catch (error) {
+            if (isCancellation(error)) {
+                throw error;
+            }
+
             console.warn('Smart image recompression failed for', fileData.name, error);
             break;
         }
@@ -1047,6 +1087,8 @@ async function compressSingleFile(fileData, compressionLevel, targetSizeBytes, f
         pdfJsDoc = await loadPdfJsDocument(arrayBuffer);
 
         for (const attempt of imageAttempts) {
+            cancellation?.throwIfCancelled();
+
             const candidateBytes = await createImageCompressedPdf(
                 pdfJsDoc,
                 attempt,
@@ -1159,6 +1201,7 @@ async function compressPDFs() {
         }
 
         isProcessing = true;
+        cancellation = createCancellation();
         setProcessingState(true, compressButton, null, 'Compress PDFs', 'Compressing...');
         resetProgress();
         setWorkflowStage('processing');
@@ -1175,6 +1218,8 @@ async function compressPDFs() {
         let targetMisses = 0;
 
         for (let i = 0; i < selectedFiles.length; i++) {
+            cancellation.throwIfCancelled();
+
             const fileData = selectedFiles[i];
 
             try {
@@ -1222,6 +1267,10 @@ async function compressPDFs() {
                     targetMet: result.targetMet
                 });
             } catch (error) {
+                if (isCancellation(error)) {
+                    throw error;
+                }
+
                 console.error('Error compressing file:', fileData.name, error);
                 failedCompressions.push({
                     name: fileData.name,
@@ -1255,11 +1304,18 @@ async function compressPDFs() {
             targetMisses
         });
     } catch (error) {
+        if (isCancellation(error)) {
+            showWarningMessage('Cancelled. Nothing was compressed, and your files are still listed.');
+            setWorkflowStage('setup');
+            return;
+        }
         console.error('Error compressing PDFs:', error);
         showErrorMessage(error.message || 'An error occurred while compressing PDFs. Please try again.');
         setWorkflowStage('setup');
     } finally {
         isProcessing = false;
+        cancellation = null;
+        resetStopButton();
         resetProgress();
         setProcessingState(false, compressButton, null, 'Compress PDFs', 'Compressing...');
     }

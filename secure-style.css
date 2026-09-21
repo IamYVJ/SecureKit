@@ -453,6 +453,12 @@
     color: var(--text-secondary);
 }
 
+.processing-actions {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+}
+
 .action-buttons {
     display: flex;
     gap: 16px;

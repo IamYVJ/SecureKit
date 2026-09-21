@@ -20,6 +20,8 @@ const PAGE_SIZES = {
 
 let selectedImages = [];
 let isProcessing = false;
+let cancellation = null;
+let resetStopButton = () => {};
 let workflowStage = 'setup';
 let lastConversionResult = null;
 let draggedIndex = null;
@@ -34,6 +36,7 @@ const fileCount = document.getElementById('fileCount');
 const addMoreButton = document.getElementById('addMoreButton');
 const clearButton = document.getElementById('clearButton');
 const convertButton = document.getElementById('convertButton');
+const stopButton = document.getElementById('stopButton');
 const processingSection = document.getElementById('processingSection');
 const processingTitle = document.getElementById('processingTitle');
 const processingMessage = document.getElementById('processingMessage');
@@ -97,6 +100,7 @@ try {
     addMoreButton?.addEventListener('click', () => fileInput.click());
     clearButton?.addEventListener('click', clearAllImages);
     convertButton?.addEventListener('click', convertToPDF);
+    resetStopButton = setupStopButton(stopButton, () => cancellation?.cancel());
     saveButton?.addEventListener('click', saveResult);
     anotherButton?.addEventListener('click', startAnother);
 
@@ -368,6 +372,7 @@ async function convertToPDF() {
     const fitMode = fitModeSelect?.value || 'contain';
 
     isProcessing = true;
+    cancellation = createCancellation();
     setProcessingState(true, convertButton, null, 'Convert to PDF', 'Converting...');
     setWorkflowStage('processing');
 
@@ -377,6 +382,8 @@ async function convertToPDF() {
         let pagesAdded = 0;
 
         for (let i = 0; i < selectedImages.length; i++) {
+            cancellation.throwIfCancelled();
+
             const imgData = selectedImages[i];
             updateProgress(i + 1, selectedImages.length, `Embedding "${imgData.name}"`, `${imgData.sizeFormatted}`);
 
@@ -427,11 +434,19 @@ async function convertToPDF() {
             failures
         });
     } catch (error) {
+        if (isCancellation(error)) {
+            showWarningMessage('Cancelled. No PDF was created, and your images are still listed.');
+            setWorkflowStage('setup');
+            return;
+        }
+
         console.error('Error converting to PDF:', error);
         showErrorMessage(error.message || 'Failed to convert images to PDF.');
         setWorkflowStage('setup');
     } finally {
         isProcessing = false;
+        cancellation = null;
+        resetStopButton();
         resetProgress();
         setProcessingState(false, convertButton, null, 'Convert to PDF', 'Converting...');
     }

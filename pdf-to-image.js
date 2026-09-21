@@ -9,6 +9,9 @@ const MAX_RENDER_PIXELS = 16_000_000;
 let selectedFile = null;
 let pdfDocCache = null;
 let isProcessing = false;
+let cancellation = null;
+let activeRenderTask = null;
+let resetStopButton = () => {};
 let workflowStage = 'setup';
 let lastResult = null;
 
@@ -20,6 +23,7 @@ const fileSection = document.getElementById('fileSection');
 const fileDisplay = document.getElementById('fileDisplay');
 const removeButton = document.getElementById('removeButton');
 const cancelButton = document.getElementById('cancelButton');
+const stopButton = document.getElementById('stopButton');
 const convertButton = document.getElementById('convertButton');
 const customPagesInput = document.getElementById('customPages');
 const renderScaleSelect = document.getElementById('renderScale');
@@ -64,6 +68,12 @@ try {
     fileInput?.addEventListener('change', handleFileSelect);
     removeButton?.addEventListener('click', clearFile);
     cancelButton?.addEventListener('click', clearFile);
+    resetStopButton = setupStopButton(stopButton, () => {
+        cancellation?.cancel();
+        // A page render can run for seconds; aborting it makes Cancel feel
+        // immediate instead of finishing the current page first.
+        activeRenderTask?.cancel();
+    });
     convertButton?.addEventListener('click', convertToImages);
     saveButton?.addEventListener('click', saveResult);
     anotherButton?.addEventListener('click', startAnother);
@@ -241,7 +251,14 @@ async function renderPageToBlob(pdfDoc, pageNumber, scale, format, jpegQuality) 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    await page.render({ canvasContext: ctx, viewport }).promise;
+    const renderTask = page.render({ canvasContext: ctx, viewport });
+    activeRenderTask = renderTask;
+
+    try {
+        await renderTask.promise;
+    } finally {
+        activeRenderTask = null;
+    }
 
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
     const blob = await new Promise((resolve) => {
@@ -298,6 +315,7 @@ async function convertToImages() {
     const ext = format === 'png' ? 'png' : 'jpg';
 
     isProcessing = true;
+    cancellation = createCancellation();
     setProcessingState(true, convertButton, null, 'Convert to Images', 'Converting...');
     setWorkflowStage('processing');
 
@@ -307,6 +325,8 @@ async function convertToImages() {
 
     try {
         for (let i = 0; i < pagesToExport.length; i++) {
+            cancellation.throwIfCancelled();
+
             const pageNumber = pagesToExport[i];
             updateProgress(i + 1, pagesToExport.length, `Rendering page ${pageNumber}`, `Format: ${ext.toUpperCase()} at ${scale}x scale`);
 
@@ -323,6 +343,12 @@ async function convertToImages() {
                 });
                 totalSize += result.blob.size;
             } catch (error) {
+                // An aborted render surfaces here; report it as the cancellation
+                // it is rather than as a failed page.
+                if (cancellation?.cancelled) {
+                    cancellation.throwIfCancelled();
+                }
+
                 console.error('Error rendering page', pageNumber, error);
                 failures.push({ pageNumber, error: error.message || 'Render failed' });
             }
@@ -342,11 +368,19 @@ async function convertToImages() {
             baseFilename
         });
     } catch (error) {
+        if (isCancellation(error)) {
+            showWarningMessage('Cancelled. No images were created.');
+            setWorkflowStage('setup');
+            return;
+        }
+
         console.error('Error converting PDF:', error);
         showErrorMessage(error.message || 'Failed to convert PDF to images.');
         setWorkflowStage('setup');
     } finally {
         isProcessing = false;
+        cancellation = null;
+        resetStopButton();
         resetProgress();
         setProcessingState(false, convertButton, null, 'Convert to Images', 'Converting...');
     }

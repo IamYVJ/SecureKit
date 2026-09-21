@@ -570,6 +570,81 @@ async function downloadAsZip(items, archiveName) {
 }
 
 // ============================================
+// CANCELLATION
+// ============================================
+
+/**
+ * Cooperative cancellation for long runs. Work loops check the token at their
+ * own await points, so a cancelled run always stops between whole steps and
+ * never leaves a half-written PDF behind.
+ *
+ * @returns {Object} - { cancelled, cancel(), throwIfCancelled() }
+ */
+function createCancellation() {
+    let cancelled = false;
+
+    return {
+        get cancelled() {
+            return cancelled;
+        },
+        cancel() {
+            cancelled = true;
+        },
+        throwIfCancelled() {
+            if (cancelled) {
+                const error = new Error('Operation cancelled.');
+                error.name = 'CancelledError';
+                throw error;
+            }
+        }
+    };
+}
+
+/**
+ * True for the error thrown by throwIfCancelled(), so tools can tell a user
+ * cancellation apart from a genuine failure.
+ */
+function isCancellation(error) {
+    return error?.name === 'CancelledError';
+}
+
+/**
+ * Wire the Cancel button shown during processing.
+ *
+ * @param {HTMLElement} button - the in-progress cancel button
+ * @param {Function} onStop - called once when the user asks to stop
+ * @returns {Function} - resets the button for the next run
+ */
+function setupStopButton(button, onStop) {
+    if (!button) {
+        return () => {};
+    }
+
+    const label = button.querySelector('span');
+    const defaultText = label?.textContent || 'Cancel';
+
+    button.addEventListener('click', () => {
+        // The work stops at its next checkpoint, so say so rather than
+        // leaving a button that looks unresponsive.
+        button.disabled = true;
+
+        if (label) {
+            label.textContent = 'Cancelling...';
+        }
+
+        onStop();
+    });
+
+    return () => {
+        button.disabled = false;
+
+        if (label) {
+            label.textContent = defaultText;
+        }
+    };
+}
+
+// ============================================
 // WORKFLOW STAGE MANAGEMENT
 // ============================================
 
