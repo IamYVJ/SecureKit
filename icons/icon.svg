@@ -1,0 +1,22 @@
+<!--
+  SecureKit app icon.
+
+  The shield is the same path the security badge uses on every tool page, so
+  the installed icon matches the mark people already see in the UI. Filled
+  rather than stroked, because a 2px outline disappears at favicon sizes.
+
+  The shield occupies the middle ~75% of the canvas, which keeps it inside the
+  safe zone of a circular or squircle mask without needing a separate file.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="SecureKit">
+    <title>SecureKit</title>
+
+    <rect width="512" height="512" fill="#000000"/>
+
+    <g transform="translate(256 256) scale(16) translate(-12 -13)">
+        <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="#2dff8f"/>
+        <!-- Keyhole, punched out in the background colour. -->
+        <circle cx="12" cy="11.2" r="2.15" fill="#000000"/>
+        <path d="M10.75 11.6h2.5l.6 4.9h-3.7z" fill="#000000"/>
+    </g>
+</svg>

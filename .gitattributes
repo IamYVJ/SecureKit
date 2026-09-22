@@ -1,2 +1,13 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Images are binary. text=auto detects this correctly today, but saying
+# so explicitly stops any future checkout from normalising line endings
+# inside a PNG and corrupting it.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary

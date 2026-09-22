@@ -12,7 +12,7 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 
 | Tool | What it does |
 | --- | --- |
-| **Merge** | Combine multiple PDFs into one, with optional page selection and drag-to-reorder |
+| **Merge** | Combine multiple PDFs into one, with optional page selection and reordering by drag or keyboard |
 | **Split** | Extract pages, split by ranges, or split every N pages |
 | **Compress** | Smart JPEG image recompression (preserves text, vectors, forms, links), with optional destructive page-flatten fallback |
 | **Secure** | Protect PDFs with AES-256 encryption, an optional separate owner password, and reader-enforced permissions (printing, copying, editing, annotating, forms, page assembly, accessibility) |
@@ -27,6 +27,20 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 - **No third-party CDNs at runtime.** All dependencies (`pdf-lib`, `pdf.js`, `JSZip`) are vendored locally under `lib/`, and encryption uses the browser's own Web Crypto API. The site can run completely air-gapped.
 - **Locked-down CSP.** Every page declares `script-src 'self'` — even if a future change accidentally tried to load remote code, the browser would block it.
 - **Service-worker-backed offline mode.** After your first visit, the entire app works without an internet connection.
+- **Installable.** SecureKit is a PWA, so it can be installed to a desktop or home screen and launched in its own window — still with no backend and no network access required.
+
+---
+
+## Accessibility
+
+- Every page starts with a skip link, names its `main`/`nav` landmarks, and
+  marks the current tool with `aria-current`.
+- Everything is reachable by keyboard. File lists can be reordered with Move
+  up / Move down buttons, so arranging pages never requires dragging.
+- Workflow changes (processing, finished, cancelled) move focus to the heading
+  of the section that appeared, and progress is announced through a live region.
+- Decorative icons are hidden from assistive technology; every control has an
+  accessible name.
 
 ---
 
@@ -51,6 +65,13 @@ SecureKit/
 ├── file-size-validation.js  # File-size limits, toast messages, sanitization
 ├── sw.js                    # Service worker (offline cache)
 ├── sw-register.js           # Service worker bootstrap
+├── manifest.json            # Web app manifest (install metadata, shortcuts)
+├── icons/
+│   ├── icon.svg             # Source mark; also the scalable favicon
+│   ├── icon-192.png         # Manifest icon (any + maskable)
+│   ├── icon-512.png         # Manifest icon (any + maskable)
+│   ├── apple-touch-icon.png # iOS home-screen icon (180x180)
+│   └── favicon-32.png       # Fallback favicon for older browsers
 ├── *-style.css              # Per-tool styles
 ├── style.css                # Shared styles
 └── lib/
@@ -90,6 +111,25 @@ curl -o jszip.min.js       https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/j
 ```
 
 After updating, bump `CACHE_VERSION` in `sw.js` so users get the new files instead of stale cached copies.
+
+## Installing
+
+SecureKit ships a web app manifest, so browsers offer it as an installable app
+(Chrome/Edge: the install icon in the address bar; Safari on iOS: Share → Add to
+Home Screen). Installed, it opens standalone with no browser chrome and runs
+fully offline from the service-worker cache.
+
+The manifest declares jump-list shortcuts for Merge, Split, Compress and Secure,
+so the four most-used tools are reachable from the app icon's context menu.
+
+Install requires a secure origin (`https://` or `localhost`), the same condition
+the service worker and the Secure tool need.
+
+The icon is a single source SVG (`icons/icon.svg`) rasterised to PNG. Its
+artwork sits inside the maskable safe zone, so one file serves both the plain
+and masked (circle / squircle) icon shapes without being clipped.
+
+---
 
 ## Encryption
 
