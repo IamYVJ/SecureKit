@@ -91,7 +91,7 @@
     color: var(--accent-primary);
 }
 
-.upload-area h3 {
+.upload-area h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -137,7 +137,7 @@
     margin-bottom: 24px;
 }
 
-.file-header h3 {
+.file-header h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -204,7 +204,18 @@
     margin-bottom: 32px;
 }
 
-.split-options-section h3 {
+/*
+ * These section headings never had a rule of their own - they were <h4>
+ * elements relying on the browser default. The heading level moved to h3
+ * to close a gap in the outline, so the size is now stated explicitly
+ * rather than inherited from whatever level the tag happens to be.
+ */
+.options-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.split-options-section h2 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
@@ -233,8 +244,25 @@
     background-color: rgba(45, 255, 143, 0.05);
 }
 
+/*
+ * Previously display:none, which made the split mode / image format choice
+ * keyboard- and screen-reader-inaccessible. Clipped instead, so the control
+ * stays focusable.
+ */
 .radio-option input[type="radio"] {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+}
+
+.radio-option input[type="radio"]:focus-visible ~ .radio-content {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: 8px;
 }
 
 .radio-option input[type="radio"]:checked + .radio-content {
@@ -608,7 +636,7 @@
     100% { transform: rotate(360deg); }
 }
 
-.processing-card h3 {
+.processing-card h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -674,7 +702,7 @@
     color: var(--accent-primary);
 }
 
-.completion-card h3 {
+.completion-card h2 {
     font-size: 30px;
     font-weight: 700;
     color: var(--text-primary);
@@ -772,7 +800,7 @@
     margin-top: 80px;
 }
 
-.info-section h3 {
+.info-section h2 {
     font-size: 32px;
     font-weight: 700;
     color: var(--text-primary);
@@ -810,7 +838,7 @@
     margin: 0 auto 20px;
 }
 
-.info-card h4 {
+.info-card h3 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
@@ -830,7 +858,7 @@
     padding: 32px;
 }
 
-.page-selection-guide h4 {
+.page-selection-guide h3 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);

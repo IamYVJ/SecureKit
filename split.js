@@ -216,7 +216,7 @@ function renderFileDisplay() {
 
     fileDisplay.innerHTML = `
         <div class="file-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg aria-hidden="true" focusable="false" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
                 <line x1="9" y1="15" x2="15" y2="15"></line>
@@ -248,9 +248,10 @@ function addRangeInput() {
             <input type="text"
                    class="range-input"
                    id="${rangeId}"
-                   placeholder="e.g., 1-5 or 1,3,5">
-            <button class="remove-range" title="Remove range">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                   placeholder="e.g., 1-5 or 1,3,5"
+                   aria-label="Page range">
+            <button type="button" class="remove-range" title="Remove range" aria-label="Remove this page range">
+                <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>

@@ -156,10 +156,16 @@ function setupAccordion(toggleElement, contentElement) {
     }
 
     try {
+        // Start from whatever the markup says, so the attribute and the class
+        // can never disagree.
+        toggleElement.setAttribute('aria-expanded',
+            contentElement.classList.contains('active') ? 'true' : 'false');
+
         toggleElement.addEventListener('click', () => {
             try {
                 toggleElement.classList.toggle('active');
-                contentElement.classList.toggle('active');
+                const open = contentElement.classList.toggle('active');
+                toggleElement.setAttribute('aria-expanded', open ? 'true' : 'false');
             } catch (error) {
                 console.error('Error toggling accordion:', error);
             }
@@ -645,6 +651,113 @@ function setupStopButton(button, onStop) {
 }
 
 // ============================================
+// ACCESSIBILITY HELPERS
+// ============================================
+
+let liveRegion = null;
+
+/**
+ * Announce a message to screen readers without moving focus or showing
+ * anything on screen. Used for changes that have no visible focus target,
+ * such as reordering or removing a file from the list.
+ *
+ * @param {string} message - Text to announce
+ */
+function announce(message) {
+    try {
+        if (!message) {
+            return;
+        }
+
+        if (!liveRegion) {
+            liveRegion = document.createElement('div');
+            liveRegion.className = 'sr-only';
+            liveRegion.setAttribute('role', 'status');
+            liveRegion.setAttribute('aria-live', 'polite');
+            document.body.appendChild(liveRegion);
+        }
+
+        // Re-announce even when the text is unchanged (e.g. moving the same
+        // item twice): clearing first forces the region to fire again.
+        liveRegion.textContent = '';
+        window.setTimeout(() => {
+            liveRegion.textContent = message;
+        }, 50);
+    } catch (error) {
+        console.error('Error announcing message:', error);
+    }
+}
+
+/**
+ * Removing a row destroys the button that had focus, which drops the user at
+ * the top of the document. Move focus to the row that took its place, or to a
+ * sensible fallback when the list is now empty.
+ *
+ * @param {HTMLElement} listElement - Container holding the rows
+ * @param {number} removedIndex - Index of the row that was removed
+ * @param {string} buttonSelector - Selector for the button to focus within a row
+ * @param {HTMLElement} [fallback] - Focused when no rows remain
+ */
+function focusAfterRemoval(listElement, removedIndex, buttonSelector, fallback) {
+    try {
+        // Hidden elements cannot take focus; focus() on one silently drops the
+        // user at the top of the document. Every candidate is checked first.
+        const isVisible = el => Boolean(el) && el.offsetParent !== null;
+
+        const rows = listElement ? listElement.children : [];
+
+        if (rows.length > 0) {
+            const next = rows[Math.min(removedIndex, rows.length - 1)];
+            const button = next?.querySelector(buttonSelector);
+
+            // When the last row goes, the tool hides the whole files section
+            // but leaves its markup in place, so a row can still be found here
+            // while being invisible.
+            if (isVisible(button)) {
+                button.focus();
+                return;
+            }
+        }
+
+        // Back at the upload section: the caller's fallback (usually
+        // "Add More") lives in the section that was just hidden.
+        const usable = isVisible(fallback)
+            ? fallback
+            : document.getElementById('browseButton');
+        usable?.focus();
+    } catch (error) {
+        console.error('Error restoring focus after removal:', error);
+    }
+}
+
+/**
+ * Move focus to a heading that has just been revealed. Screen readers announce
+ * the heading, so the user is told where they landed instead of being dropped
+ * silently at the top of the document.
+ *
+ * @param {HTMLElement} element - Heading (or container) to focus
+ */
+function focusHeading(element) {
+    try {
+        if (!element) {
+            return false;
+        }
+
+        // Headings are not focusable by default; -1 allows programmatic focus
+        // without adding a tab stop.
+        if (!element.hasAttribute('tabindex')) {
+            element.setAttribute('tabindex', '-1');
+        }
+        element.setAttribute('data-stage-heading', '');
+        element.focus({ preventScroll: true });
+        return document.activeElement === element;
+    } catch (error) {
+        console.error('Error moving focus to heading:', error);
+        return false;
+    }
+}
+
+// ============================================
 // WORKFLOW STAGE MANAGEMENT
 // ============================================
 
@@ -659,6 +772,44 @@ function setupStopButton(button, onStop) {
  * @param {boolean} [options.scrollOnTransition=false] - Scroll into view on processing/completed
  * @param {Function} [options.setupHandler] - Called with sections when stage === 'setup'
  */
+let lastAppliedStage = null;
+
+/**
+ * Hiding the section that held focus drops the user at the top of the
+ * document with nothing announced. After each real stage change, move focus
+ * into whichever section just became visible.
+ *
+ * Skipped on the very first call so the page does not steal focus on load.
+ */
+function moveFocusForStage(stage, sections) {
+    const previousStage = lastAppliedStage;
+    lastAppliedStage = stage;
+
+    if (previousStage === null || previousStage === stage) {
+        return;
+    }
+
+    const { upload, files, processing, completion } = sections || {};
+
+    if (stage === 'processing') {
+        focusHeading(processing?.querySelector('h1, h2, h3, h4'));
+        return;
+    }
+
+    if (stage === 'completed') {
+        focusHeading(completion?.querySelector('h1, h2, h3, h4'));
+        return;
+    }
+
+    // Back to setup (a cancel, or starting over): land on whichever of the two
+    // setup sections the tool chose to show.
+    const visible = [files, upload].find(el => el && el.style.display !== 'none');
+    if (focusHeading(visible?.querySelector('h1, h2, h3, h4'))) {
+        return;
+    }
+    document.getElementById('browseButton')?.focus({ preventScroll: true });
+}
+
 function applyWorkflowStage(stage, sections, options = {}) {
     const { upload, files, processing, completion, info } = sections || {};
     const { scrollOnTransition = false, setupHandler = null } = options;
@@ -672,6 +823,7 @@ function applyWorkflowStage(stage, sections, options = {}) {
         if (scrollOnTransition && processing) {
             processing.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        moveFocusForStage(stage, sections);
         return;
     }
 
@@ -684,6 +836,7 @@ function applyWorkflowStage(stage, sections, options = {}) {
         if (scrollOnTransition && completion) {
             completion.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        moveFocusForStage(stage, sections);
         return;
     }
 
@@ -698,6 +851,9 @@ function applyWorkflowStage(stage, sections, options = {}) {
             console.error('setupHandler threw:', err);
         }
     }
+
+    // After the handler, so it reflects the sections the tool actually showed.
+    moveFocusForStage(stage, sections);
 }
 
 // ============================================

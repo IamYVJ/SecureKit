@@ -91,7 +91,7 @@
     color: var(--accent-primary);
 }
 
-.upload-area h3 {
+.upload-area h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -137,7 +137,7 @@
     margin-bottom: 24px;
 }
 
-.files-header h3 {
+.files-header h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -241,7 +241,7 @@
     margin-bottom: 32px;
 }
 
-.compression-options-section h3 {
+.compression-options-section h2 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
@@ -270,8 +270,26 @@
     background-color: rgba(45, 255, 143, 0.05);
 }
 
+/*
+ * These inputs used to be display:none, which took them out of the tab order
+ * and out of the accessibility tree - the compression level could not be
+ * changed without a mouse. Clipping keeps them invisible but focusable.
+ */
 .compression-option input[type="radio"] {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+}
+
+/* The input itself is 1px, so the visible option carries the focus ring. */
+.compression-option input[type="radio"]:focus-visible + .option-content {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: 8px;
 }
 
 .compression-option input[type="radio"]:checked + .option-content {
@@ -415,7 +433,7 @@
     margin-bottom: 32px;
 }
 
-.compression-notice h4 {
+.compression-notice h3 {
     font-size: 15px;
     font-weight: 600;
     color: #ffb84d;
@@ -630,7 +648,7 @@
     100% { transform: rotate(360deg); }
 }
 
-.processing-card h3 {
+.processing-card h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -698,7 +716,7 @@
     color: var(--accent-primary);
 }
 
-.completion-card h3 {
+.completion-card h2 {
     font-size: 30px;
     font-weight: 700;
     color: var(--text-primary);
@@ -796,7 +814,7 @@
     margin-top: 80px;
 }
 
-.info-section h3 {
+.info-section h2 {
     font-size: 32px;
     font-weight: 700;
     color: var(--text-primary);
@@ -834,7 +852,7 @@
     margin: 0 auto 20px;
 }
 
-.info-card h4 {
+.info-card h3 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
@@ -854,7 +872,7 @@
     padding: 32px;
 }
 
-.compression-guide h4 {
+.compression-guide h3 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);

@@ -481,6 +481,7 @@ function renderFilesList() {
                 fileItem.className = 'file-item';
                 fileItem.draggable = true;
                 fileItem.dataset.index = index;
+                fileItem.setAttribute('role', 'listitem');
 
                 const pageInputHtml = `
                     <div class="page-selection-wrapper ${enablePageSelection?.checked ? 'active' : ''}">
@@ -498,8 +499,8 @@ function renderFilesList() {
                 `;
 
                 fileItem.innerHTML = `
-                    <div class="drag-handle">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <div class="drag-handle" aria-hidden="true">
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 16 16" fill="none">
                             <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
                             <circle cx="12" cy="4" r="1.5" fill="currentColor"/>
                             <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
@@ -507,6 +508,22 @@ function renderFilesList() {
                             <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
                             <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
                         </svg>
+                    </div>
+                    <div class="reorder-controls">
+                        <button type="button" class="reorder-button" data-dir="up" data-index="${index}"
+                                aria-label="Move ${escapeHtml(fileData.name)} up"
+                                ${index === 0 ? 'disabled' : ''}>
+                            <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="reorder-button" data-dir="down" data-index="${index}"
+                                aria-label="Move ${escapeHtml(fileData.name)} down"
+                                ${index === selectedFiles.length - 1 ? 'disabled' : ''}>
+                            <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
                     </div>
                     <div class="file-info">
                         <div class="file-header-row">
@@ -516,8 +533,8 @@ function renderFilesList() {
                                     ${fileData.size} - ${fileData.pageCount} page${fileData.pageCount !== 1 ? 's' : ''}
                                 </div>
                             </div>
-                            <button class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(fileData.name)}">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <button type="button" class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(fileData.name)}">
+                                <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
                                     <line x1="6" y1="6" x2="18" y2="18"></line>
                                 </svg>
@@ -534,6 +551,12 @@ function renderFilesList() {
 
                 const removeBtn = fileItem.querySelector('.remove-file');
                 removeBtn?.addEventListener('click', () => removeFile(index));
+
+                fileItem.querySelectorAll('.reorder-button').forEach(button => {
+                    button.addEventListener('click', () => {
+                        moveFile(index, button.dataset.dir === 'up' ? -1 : 1);
+                    });
+                });
 
                 const pageInput = fileItem.querySelector('.page-selection-input');
                 pageInput?.addEventListener('input', (e) => {
@@ -572,8 +595,11 @@ function updateSizeDisplay() {
 
 function removeFile(index) {
     try {
-        selectedFiles.splice(index, 1);
+        const [removed] = selectedFiles.splice(index, 1);
         updateUI();
+
+        announce(`${removed.name} removed. ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected.`);
+        focusAfterRemoval(filesList, index, '.remove-file', addMoreButton);
 
         if (selectedFiles.length === 0) {
             if (enablePageSelection) {
@@ -598,6 +624,39 @@ function clearAllFiles() {
     } catch (error) {
         console.error('Error clearing files:', error);
         showErrorMessage('Failed to clear files. Please try again.');
+    }
+}
+
+/**
+ * Keyboard-accessible reordering. Dragging is mouse-only, so the Move up /
+ * Move down buttons are the only way to arrange files without a pointer.
+ *
+ * @param {number} index - Current position of the file
+ * @param {number} offset - -1 to move up, 1 to move down
+ */
+function moveFile(index, offset) {
+    try {
+        const target = index + offset;
+        if (target < 0 || target >= selectedFiles.length) {
+            return;
+        }
+
+        const [moved] = selectedFiles.splice(index, 1);
+        selectedFiles.splice(target, 0, moved);
+        updateUI();
+
+        announce(`${moved.name} moved to position ${target + 1} of ${selectedFiles.length}`);
+
+        // updateUI() rebuilds the list, so re-find the button on the moved row.
+        // At either end that button is now disabled and cannot hold focus, so
+        // fall back to the one pointing the other way.
+        const row = filesList?.children[target];
+        const direction = offset < 0 ? 'up' : 'down';
+        const preferred = row?.querySelector(`.reorder-button[data-dir="${direction}"]`);
+        const fallback = row?.querySelector('.reorder-button:not([disabled])');
+        (preferred && !preferred.disabled ? preferred : fallback)?.focus();
+    } catch (error) {
+        console.error('Error moving file:', error);
     }
 }
 

@@ -735,7 +735,82 @@ html {
 
 /* Focus States */
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+[tabindex]:focus-visible {
     outline: 2px solid var(--accent-primary);
     outline-offset: 2px;
+}
+
+/*
+ * Text inputs and selects clear the native outline and draw their own ring.
+ * The ring has to stay visible against the dark card, so keyboard focus gets a
+ * real outline on top of whatever colour the component chose.
+ */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
+}
+
+/* ============================================
+   ACCESSIBILITY UTILITIES
+   ============================================ */
+
+/*
+ * Hides content from sight while leaving it in the accessibility tree and in
+ * the tab order. Unlike display:none or visibility:hidden, an element styled
+ * this way can still be focused and announced.
+ */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/*
+ * First thing in the tab order on every page: lets keyboard users jump past
+ * the seven-item tool nav instead of tabbing through it on every page.
+ */
+.skip-link {
+    /* Fixed, not absolute: an absolute link is pinned to the top of the
+       document, so it lands off-screen whenever the page is scrolled. */
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -110%);
+    z-index: 10001;
+    padding: 12px 24px;
+    background-color: var(--accent-primary);
+    color: var(--bg-primary);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 0 0 10px 10px;
+    transition: transform 0.2s ease;
+}
+
+.skip-link:focus {
+    transform: translate(-50%, 0);
+}
+
+/* The skip target should not draw a focus ring when it receives focus. */
+main:focus {
+    outline: none;
+}
+
+/*
+ * Section headings are focused when the workflow moves between stages, so the
+ * screen reader announces where it landed. That focus is programmatic, not a
+ * tab stop, so it should not paint a ring.
+ */
+[data-stage-heading]:focus {
+    outline: none;
 }

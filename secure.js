@@ -354,6 +354,7 @@ function renderFilesList() {
     selectedFiles.forEach((item) => {
         const row = document.createElement('div');
         row.className = 'file-item';
+        row.setAttribute('role', 'listitem');
 
         const icon = document.createElement('div');
         icon.className = 'file-icon';
@@ -398,8 +399,15 @@ function renderFilesList() {
 
 function removeFile(fileId) {
     try {
+        const index = selectedFiles.findIndex((file) => file.id === fileId);
+        const removed = selectedFiles[index];
         selectedFiles = selectedFiles.filter((file) => file.id !== fileId);
         updateUI();
+
+        if (removed) {
+            announce(`${removed.name} removed. ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected.`);
+        }
+        focusAfterRemoval(filesList, index, '.file-remove', addMoreButton);
     } catch (error) {
         console.error('Error removing file:', error);
         showErrorMessage('Failed to remove file. Please try again.');

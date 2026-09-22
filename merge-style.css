@@ -91,7 +91,7 @@
     color: var(--accent-primary);
 }
 
-.upload-area h3 {
+.upload-area h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -137,7 +137,7 @@
     margin-bottom: 24px;
 }
 
-.files-header h3 {
+.files-header h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -493,6 +493,44 @@
     background-color: var(--bg-primary);
 }
 
+/* Keyboard alternative to dragging a file up or down the list. */
+.reorder-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.reorder-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 24x24 is the WCAG 2.2 minimum target size (2.5.8). */
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reorder-button:hover:not(:disabled) {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.reorder-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.toggle-switch input:focus-visible + .toggle-slider {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
 .toggle-switch input:focus + .toggle-slider {
     box-shadow: 0 0 0 3px rgba(45, 255, 143, 0.2);
 }
@@ -630,7 +668,7 @@
     100% { transform: rotate(360deg); }
 }
 
-.processing-card h3 {
+.processing-card h2 {
     font-size: 24px;
     font-weight: 600;
     color: var(--text-primary);
@@ -693,7 +731,7 @@
     color: var(--accent-primary);
 }
 
-.completion-card h3 {
+.completion-card h2 {
     font-size: 30px;
     font-weight: 700;
     color: var(--text-primary);
@@ -806,7 +844,7 @@
     margin-top: 80px;
 }
 
-.info-section h3 {
+.info-section h2 {
     font-size: 32px;
     font-weight: 700;
     color: var(--text-primary);
@@ -844,7 +882,7 @@
     margin: 0 auto 20px;
 }
 
-.info-card h4 {
+.info-card h3 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
@@ -864,7 +902,7 @@
     padding: 32px;
 }
 
-.page-selection-guide h4 {
+.page-selection-guide h3 {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);

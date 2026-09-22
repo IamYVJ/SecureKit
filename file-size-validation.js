@@ -587,6 +587,7 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
         iconSvg.setAttribute('height', '20');
         iconSvg.setAttribute('viewBox', '0 0 24 24');
         iconSvg.setAttribute('fill', 'none');
+        iconSvg.setAttribute('aria-hidden', 'true');
         iconSvg.style.cssText = 'color: #ff4444; flex-shrink: 0; margin-top: 2px;';
 
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -698,6 +699,7 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
         iconSvg.setAttribute('height', '20');
         iconSvg.setAttribute('viewBox', '0 0 24 24');
         iconSvg.setAttribute('fill', 'none');
+        iconSvg.setAttribute('aria-hidden', 'true');
         iconSvg.style.cssText = 'color: #000000; flex-shrink: 0; margin-top: 2px;';
 
         const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -790,6 +792,7 @@ function showSuccessMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
         iconSvg.setAttribute('height', '20');
         iconSvg.setAttribute('viewBox', '0 0 24 24');
         iconSvg.setAttribute('fill', 'none');
+        iconSvg.setAttribute('aria-hidden', 'true');
         iconSvg.style.cssText = 'color: #000000; flex-shrink: 0;';
 
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');

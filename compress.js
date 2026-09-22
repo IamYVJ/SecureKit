@@ -330,10 +330,11 @@ function renderFilesList() {
             try {
                 const fileItem = document.createElement('div');
                 fileItem.className = 'file-item';
+                fileItem.setAttribute('role', 'listitem');
 
                 fileItem.innerHTML = `
                     <div class="file-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg aria-hidden="true" focusable="false" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
                         </svg>
@@ -342,8 +343,8 @@ function renderFilesList() {
                         <div class="file-name">${escapeHtml(fileData.name)}</div>
                         <div class="file-size">${fileData.sizeFormatted}</div>
                     </div>
-                    <button class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(fileData.name)}">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button type="button" class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(fileData.name)}">
+                        <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
@@ -365,8 +366,11 @@ function renderFilesList() {
 
 function removeFile(index) {
     try {
-        selectedFiles.splice(index, 1);
+        const [removed] = selectedFiles.splice(index, 1);
         updateUI();
+
+        announce(`${removed.name} removed. ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected.`);
+        focusAfterRemoval(filesList, index, '.remove-file', addMoreButton);
     } catch (error) {
         console.error('Error removing file:', error);
         showErrorMessage('Failed to remove file. Please try again.');

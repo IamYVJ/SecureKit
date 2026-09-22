@@ -163,8 +163,11 @@ function addImages(files) {
 }
 
 function removeImage(index) {
-    selectedImages.splice(index, 1);
+    const [removed] = selectedImages.splice(index, 1);
     updateUI();
+
+    announce(`${removed.name} removed. ${selectedImages.length} image${selectedImages.length === 1 ? '' : 's'} selected.`);
+    focusAfterRemoval(filesList, index, '.remove-file', addMoreButton);
 }
 
 function clearAllImages() {
@@ -220,10 +223,11 @@ function renderImagesList() {
         item.className = 'file-item';
         item.draggable = true;
         item.dataset.index = index;
+        item.setAttribute('role', 'listitem');
 
         item.innerHTML = `
-            <div class="drag-handle" aria-label="Drag to reorder">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <div class="drag-handle" aria-hidden="true">
+                <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
                     <circle cx="12" cy="4" r="1.5" fill="currentColor"/>
                     <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
@@ -232,14 +236,30 @@ function renderImagesList() {
                     <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
                 </svg>
             </div>
+            <div class="reorder-controls">
+                <button type="button" class="reorder-button" data-dir="up" data-index="${index}"
+                        aria-label="Move ${escapeHtml(img.name)} up"
+                        ${index === 0 ? 'disabled' : ''}>
+                    <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <button type="button" class="reorder-button" data-dir="down" data-index="${index}"
+                        aria-label="Move ${escapeHtml(img.name)} down"
+                        ${index === selectedImages.length - 1 ? 'disabled' : ''}>
+                    <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
             <div class="file-info">
                 <div class="file-header-row">
                     <div class="file-meta">
                         <div class="file-name">Page ${index + 1} - ${escapeHtml(img.name)}</div>
                         <div class="file-details">${img.sizeFormatted} - ${img.type === 'image/png' ? 'PNG' : 'JPG'}</div>
                     </div>
-                    <button class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(img.name)}">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button type="button" class="remove-file" data-index="${index}" aria-label="Remove ${escapeHtml(img.name)}">
+                        <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
@@ -255,8 +275,42 @@ function renderImagesList() {
 
         item.querySelector('.remove-file')?.addEventListener('click', () => removeImage(index));
 
+        item.querySelectorAll('.reorder-button').forEach(button => {
+            button.addEventListener('click', () => {
+                moveImage(index, button.dataset.dir === 'up' ? -1 : 1);
+            });
+        });
+
         filesList.appendChild(item);
     });
+}
+
+/**
+ * Keyboard-accessible reordering, since dragging needs a pointer.
+ * Page order is the output order, so this has to be reachable without a mouse.
+ *
+ * @param {number} index - Current position of the image
+ * @param {number} offset - -1 to move up, 1 to move down
+ */
+function moveImage(index, offset) {
+    const target = index + offset;
+    if (target < 0 || target >= selectedImages.length) {
+        return;
+    }
+
+    const [moved] = selectedImages.splice(index, 1);
+    selectedImages.splice(target, 0, moved);
+    renderImagesList();
+
+    announce(`${moved.name} moved to page ${target + 1} of ${selectedImages.length}`);
+
+    // The list was rebuilt; put focus back on the row that moved. The button
+    // is disabled at either end, so fall back to the other direction.
+    const row = filesList?.children[target];
+    const direction = offset < 0 ? 'up' : 'down';
+    const preferred = row?.querySelector(`.reorder-button[data-dir="${direction}"]`);
+    const fallback = row?.querySelector('.reorder-button:not([disabled])');
+    (preferred && !preferred.disabled ? preferred : fallback)?.focus();
 }
 
 function handleDragStart(e) {

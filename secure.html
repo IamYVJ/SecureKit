@@ -21,10 +21,12 @@
     <link rel="stylesheet" href="validation-styles.css">
 </head>
 <body>
-    <div class="grain-overlay"></div>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+
+    <div class="grain-overlay" aria-hidden="true"></div>
 
     <header>
-        <nav class="container">
+        <nav class="container" aria-label="Main">
             <a href="index.html#hero" class="logo-link">
                 <span class="logo-text">Secure<span class="accent">Kit</span></span>
             </a>
@@ -33,7 +35,7 @@
                 <li><a href="merge.html">Merge</a></li>
                 <li><a href="split.html">Split</a></li>
                 <li><a href="compress.html">Compress</a></li>
-                <li><a href="secure.html">Secure</a></li>
+                <li><a href="secure.html" aria-current="page">Secure</a></li>
                 <li><a href="pdf-to-image.html">PDF to Image</a></li>
                 <li><a href="image-to-pdf.html">Image to PDF</a></li>
                 <li><a href="index.html#about">About</a></li>
@@ -41,11 +43,11 @@
         </nav>
     </header>
 
-    <main class="tool-page">
+    <main class="tool-page" id="mainContent" tabindex="-1">
         <div class="container">
             <div class="tool-header-section">
                 <div class="tool-icon-large">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <svg aria-hidden="true" focusable="false" width="48" height="48" viewBox="0 0 24 24" fill="none">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2"/>
                         <path d="M14 2v6h6M9 14a3 3 0 0 1 6 0v4H9zM12 10.75v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -55,7 +57,7 @@
                 <p class="tool-description">Add password protection to your PDF files entirely in your browser. No uploads, no servers, no document leaves your device.</p>
 
                 <div class="security-badge">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                     </svg>
                     <span>100% Local Processing - Your files and passwords stay on your device</span>
@@ -67,7 +69,7 @@
                     <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 <div>
-                    <h4>Password protection is unavailable on this connection</h4>
+                    <h2>Password protection is unavailable on this connection</h2>
                     <p id="insecureContextMessage">Browsers only provide the encryption API SecureKit needs on a secure origin. Open this page over <strong>https://</strong> or <strong>http://localhost</strong> to protect PDFs.</p>
                     <p class="security-alert-note">The other SecureKit tools work normally here.</p>
                 </div>
@@ -75,10 +77,10 @@
 
             <div class="upload-section" id="uploadSection">
                 <div class="upload-area" id="uploadArea">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" class="upload-icon">
+                    <svg aria-hidden="true" focusable="false" width="64" height="64" viewBox="0 0 24 24" fill="none" class="upload-icon">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <h3>Drop PDF files here</h3>
+                    <h2>Drop PDF files here</h2>
                     <p>or click to browse</p>
                     <input type="file" id="fileInput" accept=".pdf" multiple hidden>
                     <button class="browse-button" id="browseButton">
@@ -90,21 +92,21 @@
             <div class="files-section" id="filesSection" style="display: none;">
                 <div class="files-header">
                     <div class="files-header-copy">
-                        <h3>Selected Files: <span id="fileCount">0</span></h3>
+                        <h2>Selected Files: <span id="fileCount">0</span></h2>
                         <div class="total-size-indicator">Total size: <span id="totalSize">0 Bytes</span></div>
                     </div>
                     <button class="secondary-button" id="addMoreButton">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                             <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         </svg>
                         <span>Add More</span>
                     </button>
                 </div>
 
-                <div class="files-list" id="filesList"></div>
+                <div class="files-list" id="filesList" role="list" aria-label="Selected files"></div>
 
                 <div class="security-options-section">
-                    <h3>Password Protection</h3>
+                    <h2>Password Protection</h2>
                     <div class="password-grid">
                         <div class="option-group">
                             <label for="openPassword" class="input-label">Open password</label>
@@ -128,14 +130,14 @@
                 </div>
 
                 <div class="options-accordion">
-                    <button class="accordion-header" id="accordionToggle">
+                    <button type="button" class="accordion-header" id="accordionToggle" aria-expanded="false" aria-controls="accordionContent">
                         <span class="accordion-title">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                             Advanced Options
                         </span>
-                        <svg class="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <svg aria-hidden="true" focusable="false" class="accordion-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
                             <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </button>
@@ -205,21 +207,21 @@
                 </div>
 
                 <div class="security-notice">
-                    <h4>Important</h4>
+                    <h3>Important</h3>
                     <p>Files are encrypted with <strong>AES-256</strong> (PDF 2.0 standard security). Keep your password safe &mdash; if you forget it, the protected PDF is not recoverable. SecureKit does not store or transmit your passwords anywhere.</p>
                     <p>Opening an AES-256 PDF needs a current reader: Acrobat X or later, recent Preview, Chrome, Firefox or Edge. Acrobat 9 and older cannot open these files.</p>
                 </div>
 
                 <div class="action-buttons">
                     <button class="secondary-button" id="clearButton">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                             <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                         <span>Clear All</span>
                     </button>
 
                     <button class="primary-button" id="protectButton">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                             <path d="M12 2l7 4v6c0 5-3.3 9.74-7 10-3.7-.26-7-5-7-10V6l7-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                             <path d="M9.5 11.5a2.5 2.5 0 1 1 5 0V15h-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
@@ -231,16 +233,16 @@
             <div class="processing-section" id="processingSection" style="display: none;">
                 <div class="processing-card">
                     <div class="spinner"></div>
-                    <h3 id="processingTitle">Protecting PDFs...</h3>
+                    <h2 id="processingTitle">Protecting PDFs...</h2>
                     <p id="processingMessage">Please wait while password protection is applied to your files</p>
-                    <div class="progress-info" id="progressInfo" style="display: none;">
+                    <div class="progress-info" id="progressInfo" role="status" style="display: none;">
                         <div class="progress-text">Processing file <span id="currentFile">1</span> of <span id="totalFiles">1</span></div>
                         <div class="security-stats" id="securityStats"></div>
                     </div>
 
                     <div class="processing-actions">
                         <button class="secondary-button" id="stopButton">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                             <span>Cancel</span>
@@ -252,24 +254,24 @@
             <div class="completion-section" id="completionSection" style="display: none;">
                 <div class="completion-card">
                     <div class="completion-icon">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                        <svg aria-hidden="true" focusable="false" width="28" height="28" viewBox="0 0 24 24" fill="none">
                             <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
-                    <h3 id="completionTitle">Protected PDFs Ready</h3>
+                    <h2 id="completionTitle">Protected PDFs Ready</h2>
                     <p id="completionSummary">Your password-protected files are ready to save.</p>
                     <div class="completion-stats-grid" id="completionStats"></div>
                     <div class="completion-details" id="completionDetails"></div>
                     <div class="completion-actions">
                         <button class="primary-button" id="saveButton">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2"/>
                                 <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                             <span>Save Files</span>
                         </button>
                         <button class="secondary-button" id="anotherButton">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none">
                                 <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                             <span>Secure Another</span>
@@ -279,34 +281,34 @@
             </div>
 
             <div class="info-section">
-                <h3>How It Works</h3>
+                <h2>How It Works</h2>
 
                 <div class="info-grid">
                     <div class="info-card">
                         <div class="info-number">1</div>
-                        <h4>Upload PDFs</h4>
+                        <h3>Upload PDFs</h3>
                         <p>Select one or more PDF files you want to protect.</p>
                     </div>
 
                     <div class="info-card">
                         <div class="info-number">2</div>
-                        <h4>Set Password</h4>
+                        <h3>Set Password</h3>
                         <p>Choose the password readers must enter before the document opens.</p>
                     </div>
 
                     <div class="info-card">
                         <div class="info-number">3</div>
-                        <h4>Save Protected Files</h4>
+                        <h3>Save Protected Files</h3>
                         <p>Download the secured PDFs directly from your browser when processing finishes.</p>
                     </div>
                 </div>
 
                 <div class="security-guide">
-                    <h4>Password Tips</h4>
+                    <h3>Password Tips</h3>
                     <div class="guide-grid">
                         <div class="guide-item">
                             <div class="guide-header">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                     <path d="M12 2l7 4v6c0 5-3.3 9.74-7 10-3.7-.26-7-5-7-10V6l7-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                                 </svg>
                                 <span>Use a unique password</span>
@@ -316,7 +318,7 @@
 
                         <div class="guide-item recommended-guide">
                             <div class="guide-header">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                     <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                                 </svg>
                                 <span>Store it safely</span>
@@ -326,7 +328,7 @@
 
                         <div class="guide-item">
                             <div class="guide-header">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                     <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                                 </svg>
