@@ -9,6 +9,35 @@ const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png'];
 const ALLOWED_IMAGE_EXTS = ['.jpg', '.jpeg', '.png'];
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
 
+/*
+ * Memory cost is driven by format, not by file size.
+ *
+ * pdf-lib embeds a JPEG's compressed stream verbatim, so a 5.5 MB / 9 megapixel
+ * JPEG costs almost nothing beyond its own bytes. A PNG is fully decoded to RGBA
+ * first, so cost scales with pixels and is unrelated to how well the file
+ * compressed: a 0.17 MB 3000x3000 PNG measured ~103 MB of heap, roughly 600x its
+ * file size. Estimating from file size alone would miss that by two orders of
+ * magnitude.
+ *
+ * Measured heap was 2.0-3.2x the raw RGBA buffer across sizes; 3 is the
+ * conservative end of that range.
+ */
+const PNG_DECODE_FACTOR = 3;
+const JPEG_EMBED_FACTOR = 2;
+
+// Used when a header will not parse. Such a file will almost certainly fail to
+// embed anyway, so this only needs to be non-trivial, not accurate.
+const UNKNOWN_DIMENSION_FACTOR = 12;
+
+/*
+ * A hard ceiling, checked separately from checkAvailableMemory(), because that
+ * helper can only compare against a real heap limit on browsers exposing
+ * performance.memory (Chromium). Everywhere else it never blocks, so without
+ * this a single absurd image (20000x20000 PNG, ~4.8 GB) would sail through on
+ * Firefox and Safari.
+ */
+const MAX_ESTIMATED_MEMORY = 1024 * 1024 * 1024;
+
 // Page sizes in PDF points (1 inch = 72 pt)
 const PAGE_SIZES = {
     a4:     [595.28, 841.89],
@@ -83,6 +112,88 @@ function validateImage(file) {
     return { valid: true };
 }
 
+/**
+ * Read an image's pixel dimensions from its header, without decoding it.
+ *
+ * Decoding is the thing being guarded against, so the guard cannot afford to
+ * decode in order to measure. Both formats state their size in the first few
+ * bytes.
+ *
+ * @param {File} file - Image to inspect
+ * @returns {Promise<Object|null>} - { width, height }, or null if unreadable
+ */
+async function readImageDimensions(file) {
+    try {
+        // A baseline JPEG puts its frame header near the start, but a
+        // progressive one can carry a lot of metadata first. 256 KB is
+        // comfortably past any realistic EXIF/ICC payload.
+        const header = new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer());
+        const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
+
+        // PNG: 8-byte signature, then IHDR carries width and height.
+        if (header.length >= 24
+            && header[0] === 0x89 && header[1] === 0x50
+            && header[2] === 0x4e && header[3] === 0x47) {
+            return { width: view.getUint32(16), height: view.getUint32(20) };
+        }
+
+        // JPEG: walk the segment chain looking for a Start Of Frame.
+        if (header.length >= 4 && header[0] === 0xff && header[1] === 0xd8) {
+            let i = 2;
+
+            while (i + 9 < header.length) {
+                if (header[i] !== 0xff) {
+                    i++;            // fill byte or padding; resync
+                    continue;
+                }
+
+                const marker = header[i + 1];
+
+                // SOF0-SOF15 describe the frame. C4 (Huffman tables), C8
+                // (reserved) and CC (arithmetic coding conditioning) sit in the
+                // same numeric range but are not frame headers.
+                if (marker >= 0xc0 && marker <= 0xcf
+                    && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+                    return { height: view.getUint16(i + 5), width: view.getUint16(i + 7) };
+                }
+
+                // Standalone markers carry no length field.
+                if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+                    i += 2;
+                    continue;
+                }
+
+                const length = view.getUint16(i + 2);
+                if (length < 2) {
+                    break;          // malformed; stop rather than loop forever
+                }
+                i += 2 + length;
+            }
+        }
+    } catch (error) {
+        console.warn('Could not read image dimensions:', file.name, error);
+    }
+
+    return null;
+}
+
+/**
+ * Estimate peak memory for embedding one image.
+ *
+ * @param {Object} image - { type, size, width, height }
+ * @returns {number} - Estimated bytes
+ */
+function estimateImageMemory(image) {
+    if (image.type === 'image/png') {
+        if (image.width && image.height) {
+            return image.width * image.height * 4 * PNG_DECODE_FACTOR;
+        }
+        return image.size * UNKNOWN_DIMENSION_FACTOR;
+    }
+
+    return image.size * JPEG_EMBED_FACTOR;
+}
+
 try {
     if (typeof PDFLib === 'undefined') {
         throw new Error('PDF-lib failed to load');
@@ -130,35 +241,83 @@ function handleFileSelect(e) {
     fileInput.value = '';
 }
 
-function addImages(files) {
-    if (!Array.isArray(files) || files.length === 0) return;
+async function addImages(files) {
+    try {
+        if (!Array.isArray(files) || files.length === 0) return;
 
-    const valid = [];
-    const errors = [];
+        const valid = [];
+        const errors = [];
 
-    files.forEach((file) => {
-        const result = validateImage(file);
-        if (!result.valid) {
-            errors.push(result.error);
+        for (const file of files) {
+            const result = validateImage(file);
+            if (!result.valid) {
+                errors.push(result.error);
+                continue;
+            }
+
+            const type = file.type
+                || (file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+            const dimensions = await readImageDimensions(file);
+
+            valid.push({
+                id: Date.now() + Math.random(),
+                file,
+                name: file.name,
+                size: file.size,
+                sizeFormatted: formatFileSize(file.size),
+                type,
+                width: dimensions?.width || null,
+                height: dimensions?.height || null
+            });
+        }
+
+        if (errors.length > 0) {
+            showErrorMessage(errors.join('\n'));
+        }
+
+        if (valid.length === 0) {
             return;
         }
-        valid.push({
-            id: Date.now() + Math.random(),
-            file,
-            name: file.name,
-            size: file.size,
-            sizeFormatted: formatFileSize(file.size),
-            type: file.type || (file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg')
-        });
-    });
 
-    if (errors.length > 0) {
-        showErrorMessage(errors.join('\n'));
-    }
+        // Guard against the whole batch, not just the new files: every image stays
+        // in the document until save, so cost accumulates across additions.
+        const combined = [...selectedImages, ...valid];
 
-    if (valid.length > 0) {
+        const totalValidation = validateTotalSize(combined);
+        if (!totalValidation.valid) {
+            showErrorMessage(totalValidation.error);
+            return;
+        }
+
+        const estimatedMemory = combined.reduce(
+            (sum, image) => sum + estimateImageMemory(image), 0);
+
+        if (estimatedMemory > MAX_ESTIMATED_MEMORY) {
+            const estimatedMB = (estimatedMemory / (1024 * 1024)).toFixed(0);
+            const limitMB = (MAX_ESTIMATED_MEMORY / (1024 * 1024)).toFixed(0);
+            showErrorMessage(
+                `These images need roughly ${estimatedMB} MB of memory to convert, `
+                + `over the ${limitMB} MB limit.\nConvert them in smaller batches, or `
+                + 'save large PNGs as JPG first - JPGs are embedded without being decoded.');
+            return;
+        }
+
+        const memoryCheck = checkAvailableMemory(estimatedMemory);
+        if (!memoryCheck.hasEnough) {
+            showErrorMessage(memoryCheck.warning
+                || 'Not enough memory to convert these images. Try a smaller batch.');
+            return;
+        }
+
+        if (memoryCheck.warning) {
+            showWarningMessage(memoryCheck.warning);
+        }
+
         selectedImages.push(...valid);
         updateUI();
+    } catch (error) {
+        console.error('Error in addImages:', error);
+        showErrorMessage('An error occurred while adding images. Please try again.');
     }
 }
 
