@@ -206,36 +206,6 @@
     color: var(--text-secondary);
 }
 
-.file-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.icon-button {
-    width: 36px;
-    height: 36px;
-    background-color: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    color: var(--text-secondary);
-}
-
-.icon-button:hover {
-    background-color: var(--bg-primary);
-    border-color: var(--accent-primary);
-    color: var(--accent-primary);
-}
-
-.icon-button.delete:hover {
-    border-color: #ff4444;
-    color: #ff4444;
-}
-
 /* Compression Options Section */
 .compression-options-section {
     margin-bottom: 32px;
@@ -445,7 +415,6 @@
     line-height: 1.6;
     color: var(--text-secondary);
 }
-
 
 /* Options Accordion */
 .options-accordion {

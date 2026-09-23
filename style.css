@@ -419,16 +419,6 @@ nav {
 .tool-button:hover svg {
     transform: translateX(4px);
 }
-
-.tool-button-disabled,
-.tool-button-disabled:hover {
-    background-color: transparent;
-    color: var(--text-muted);
-    border-color: var(--border-color);
-    cursor: not-allowed;
-    transform: none;
-}
-
 /* About Section */
 .about-section {
     padding: 100px 0 120px;

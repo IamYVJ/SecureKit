@@ -59,32 +59,6 @@
     background-color: #ff9800;
     color: #000000;
 }
-
-/* ============================================
-   FILE SIZE WARNING IN FILE LIST
-   ============================================ */
-
-.file-size-warning {
-    width: 100%;
-    padding: 10px 14px;
-    margin-top: 10px;
-    background-color: rgba(255, 152, 0, 0.1);
-    border: 1px solid #ff9800;
-    border-radius: 8px;
-    color: #ff9800;
-    font-size: 13px;
-    line-height: 1.4;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    animation: fadeIn 0.3s ease-in;
-}
-
-.file-size-warning svg {
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
 /* ============================================
    TOTAL SIZE INDICATOR
    ============================================ */
@@ -111,23 +85,6 @@
 }
 
 /* ============================================
-   FILE ITEM ENHANCEMENTS
-   ============================================ */
-
-/* Add visual indicator for large files */
-.file-item.large-file {
-    border-color: #ff9800 !important;
-    background-color: rgba(255, 152, 0, 0.05);
-}
-
-.file-item.oversized-file {
-    border-color: #ff4444 !important;
-    background-color: rgba(255, 68, 68, 0.05);
-    opacity: 0.7;
-    pointer-events: none;
-}
-
-/* ============================================
    RESPONSIVE ADJUSTMENTS
    ============================================ */
 
@@ -136,11 +93,6 @@
         max-width: 95%;
         font-size: 14px;
         padding: 14px 20px;
-    }
-
-    .file-size-warning {
-        font-size: 12px;
-        padding: 8px 12px;
     }
 }
 
@@ -155,11 +107,6 @@
         width: 18px;
         height: 18px;
     }
-
-    .file-size-warning {
-        flex-direction: column;
-        align-items: flex-start;
-    }
 }
 
 /* ============================================
@@ -172,12 +119,6 @@
         border-color: #ff4444;
         color: #f0f6fc;
     }
-
-    .file-size-warning {
-        background-color: rgba(255, 152, 0, 0.15);
-        border-color: #ff9800;
-        color: #ffb84d;
-    }
 }
 
 /* ============================================
@@ -188,20 +129,11 @@
 .validation-message[role="alert"] {
     position: fixed;
 }
-
-/* Focus styles for interactive elements */
-.file-size-warning:focus-within {
-    outline: 2px solid #ff9800;
-    outline-offset: 2px;
-}
-
 /* ============================================
    PRINT STYLES
    ============================================ */
 
-@media print {
-    .validation-message,
-    .file-size-warning {
+@media print {.validation-message {
         display: none;
     }
 }
@@ -218,10 +150,6 @@
     .validation-warning {
         border: 2px solid #000000;
     }
-
-    .file-size-warning {
-        border-width: 2px;
-    }
 }
 
 /* ============================================
@@ -232,11 +160,6 @@
     .validation-message {
         animation: none;
     }
-
-    .file-size-warning {
-        animation: none;
-    }
-
     @keyframes slideDown {
         from, to {
             opacity: 1;
@@ -262,33 +185,6 @@
     color: #000000;
     border: 2px solid #2dff8f;
 }
-
-/* Info indicator (for future use) */
-.validation-info {
-    background-color: #0ea5e9;
-    color: #ffffff;
-    border: 2px solid #0ea5e9;
-}
-
-/* Loading state */
-.validation-loading {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.validation-loading::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    right: 16px;
-    width: 16px;
-    height: 16px;
-    border: 2px solid transparent;
-    border-top-color: currentColor;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
 @keyframes spin {
     to {
         transform: rotate(360deg);
@@ -302,9 +198,4 @@
 /* Ensure validation messages appear above everything */
 .validation-message {
     z-index: 10000;
-}
-
-/* File warnings should be inline */
-.file-size-warning {
-    z-index: 1;
 }

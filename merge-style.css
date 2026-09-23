@@ -190,14 +190,6 @@
 .drag-handle:active {
     cursor: grabbing;
 }
-
-.drag-line {
-    width: 20px;
-    height: 2px;
-    background-color: var(--text-muted);
-    border-radius: 2px;
-}
-
 .file-icon {
     width: 48px;
     height: 48px;
@@ -266,31 +258,6 @@
     background-color: rgba(255, 90, 90, 0.08);
 }
 
-.icon-button {
-    width: 36px;
-    height: 36px;
-    background-color: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    color: var(--text-secondary);
-}
-
-.icon-button:hover {
-    background-color: var(--bg-primary);
-    border-color: var(--accent-primary);
-    color: var(--accent-primary);
-}
-
-.icon-button.delete:hover {
-    border-color: #ff4444;
-    color: #ff4444;
-}
-
 /* Page Selection Input */
 .page-selection-wrapper {
     width: 100%;
@@ -317,10 +284,7 @@
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
-}
-
-.page-input,
-.page-selection-input {
+}.page-selection-input {
     flex: 1 1 240px;
     min-width: 180px;
     background-color: var(--bg-primary);
@@ -331,17 +295,11 @@
     font-size: 14px;
     font-family: 'Consolas', 'Monaco', monospace;
     transition: all 0.3s ease;
-}
-
-.page-input:focus,
-.page-selection-input:focus {
+}.page-selection-input:focus {
     outline: none;
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px rgba(45, 255, 143, 0.1);
-}
-
-.page-input::placeholder,
-.page-selection-input::placeholder {
+}.page-selection-input::placeholder {
     color: var(--text-muted);
 }
 

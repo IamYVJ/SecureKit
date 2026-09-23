@@ -17,7 +17,6 @@ const FILE_SIZE_CONFIG = {
 };
 
 // Global error tracking
-let activeMessages = new Set();
 let errorCount = 0;
 
 // Security: Allowed file extensions (whitelist approach)
@@ -546,7 +545,6 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
         if (existing) {
             try {
                 existing.remove();
-                activeMessages.delete('error');
             } catch (e) {
                 console.warn('Failed to remove existing error message:', e);
             }
@@ -614,7 +612,6 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
         errorDiv.appendChild(messageSpan);
 
         document.body.appendChild(errorDiv);
-        activeMessages.add('error');
 
         setTimeout(() => {
             try {
@@ -623,7 +620,6 @@ function showErrorMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATION_
                     setTimeout(() => {
                         if (errorDiv.parentNode) {
                             errorDiv.remove();
-                            activeMessages.delete('error');
                         }
                     }, 300);
                 }
@@ -660,7 +656,6 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
         if (existing) {
             try {
                 existing.remove();
-                activeMessages.delete('warning');
             } catch (e) {
                 console.warn('Failed to remove existing warning:', e);
             }
@@ -723,7 +718,6 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
         warningDiv.appendChild(messageSpan);
 
         document.body.appendChild(warningDiv);
-        activeMessages.add('warning');
 
         setTimeout(() => {
             try {
@@ -732,7 +726,6 @@ function showWarningMessage(message, duration = FILE_SIZE_CONFIG.MESSAGE_DURATIO
                     setTimeout(() => {
                         if (warningDiv.parentNode) {
                             warningDiv.remove();
-                            activeMessages.delete('warning');
                         }
                     }, 300);
                 }
@@ -885,23 +878,6 @@ function checkBrowserCompatibility() {
 // UTILITY FUNCTIONS
 // ============================================
 // Note: formatFileSize() lives in shared-utils.js (loaded before this file).
-
-/**
- * Clear all active validation messages
- */
-function clearAllMessages() {
-    try {
-        const errorMsg = document.getElementById('validation-error-message');
-        const warningMsg = document.getElementById('validation-warning-message');
-
-        if (errorMsg) errorMsg.remove();
-        if (warningMsg) warningMsg.remove();
-
-        activeMessages.clear();
-    } catch (error) {
-        console.error('Error clearing messages:', error);
-    }
-}
 
 // ============================================
 // INITIALIZATION

@@ -150,60 +150,14 @@
     padding: 24px;
     margin-bottom: 32px;
 }
-
-.file-card {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.file-icon-large {
-    width: 64px;
-    height: 64px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--accent-primary);
-    flex-shrink: 0;
-}
-
 .file-details {
     flex: 1;
 }
-
-.file-name-large {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-}
-
 .file-meta {
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
 }
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    color: var(--text-secondary);
-}
-
-.meta-item svg {
-    color: var(--accent-primary);
-}
-
-/* Split Options Section */
-.split-options-section {
-    margin-bottom: 32px;
-}
-
 /*
  * These section headings never had a rule of their own - they were <h4>
  * elements relying on the browser default. The heading level moved to h3
@@ -214,20 +168,6 @@
     font-size: 16px;
     font-weight: 700;
 }
-
-.split-options-section h2 {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 20px;
-}
-
-.split-mode-options {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
 /* Radio Option Styling */
 .radio-option {
     background-color: var(--bg-card);
@@ -270,118 +210,18 @@
     padding-left: 17px;
 }
 
-.radio-option input[type="radio"]:checked + .radio-content .radio-circle {
-    background-color: var(--accent-primary);
-    border-color: var(--accent-primary);
-}
-
-.radio-option input[type="radio"]:checked + .radio-content .radio-circle::after {
-    opacity: 1;
-    transform: scale(1);
-}
-
 .radio-content {
     transition: all 0.3s ease;
 }
-
-.radio-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.radio-circle {
-    width: 22px;
-    height: 22px;
-    border: 2px solid var(--border-color);
-    border-radius: 50%;
-    position: relative;
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-}
-
-.radio-circle::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    width: 10px;
-    height: 10px;
-    background-color: var(--bg-primary);
-    border-radius: 50%;
-    opacity: 0;
-    transition: all 0.3s ease;
-}
-
 .radio-title {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
 }
-
-.radio-description {
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin-left: 34px;
-    line-height: 1.5;
-}
-
 .radio-input-wrapper {
     margin-top: 16px;
     margin-left: 34px;
 }
-
-/* Page Input */
-.page-input {
-    width: 100%;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: var(--text-primary);
-    font-size: 14px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    transition: all 0.3s ease;
-}
-
-.page-input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(45, 255, 143, 0.1);
-}
-
-.page-input::placeholder {
-    color: var(--text-muted);
-}
-
-/* Number Input */
-.number-input {
-    width: 150px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: var(--text-primary);
-    font-size: 14px;
-    transition: all 0.3s ease;
-}
-
-.number-input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(45, 255, 143, 0.1);
-}
-
-/* Ranges List */
-.ranges-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
 .range-item {
     display: flex;
     gap: 12px;
@@ -391,27 +231,6 @@
 .range-item input {
     flex: 1;
 }
-
-.remove-range-button {
-    width: 36px;
-    height: 36px;
-    background-color: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    color: var(--text-secondary);
-    flex-shrink: 0;
-}
-
-.remove-range-button:hover {
-    border-color: #ff4444;
-    color: #ff4444;
-}
-
 .add-range-button {
     background-color: transparent;
     border: 1px dashed var(--border-color);
@@ -940,12 +759,6 @@
     .format-examples {
         grid-template-columns: 1fr;
     }
-
-    .file-card {
-        flex-direction: column;
-        text-align: center;
-    }
-
     .file-meta {
         justify-content: center;
     }
@@ -955,11 +768,6 @@
     .tool-title {
         font-size: 32px;
     }
-
-    .radio-description {
-        margin-left: 0;
-    }
-
     .radio-input-wrapper {
         margin-left: 0;
     }
