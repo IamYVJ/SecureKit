@@ -651,6 +651,56 @@ function setupStopButton(button, onStop) {
 }
 
 // ============================================
+// MEMORY BUDGET
+// ============================================
+
+/*
+ * checkAvailableMemory() can only refuse work on browsers that expose
+ * performance.memory (Chromium). Elsewhere it never blocks, and even where it
+ * does, the heap limit is generous enough to wave through a batch that would
+ * make the tab crawl.
+ *
+ * This ceiling is the backstop: a flat cap that applies in every browser. Each
+ * tool estimates its own peak - the costs differ wildly, from a JPEG that is
+ * embedded untouched to a PNG that is decoded to raw pixels - and then passes
+ * the number here.
+ */
+const MAX_ESTIMATED_MEMORY = 1024 * 1024 * 1024;
+
+/**
+ * Decide whether an operation's estimated peak memory is acceptable.
+ *
+ * @param {number} estimatedBytes - Estimated peak usage
+ * @param {string} [advice] - Tool-specific suggestion appended to a refusal
+ * @returns {Object} - { ok, error, warning }
+ */
+function checkMemoryBudget(estimatedBytes, advice) {
+    const estimatedMB = (estimatedBytes / (1024 * 1024)).toFixed(0);
+
+    if (estimatedBytes > MAX_ESTIMATED_MEMORY) {
+        const limitMB = (MAX_ESTIMATED_MEMORY / (1024 * 1024)).toFixed(0);
+        return {
+            ok: false,
+            error: `This needs roughly ${estimatedMB} MB of memory, over the `
+                 + `${limitMB} MB limit.` + (advice ? '\n' + advice : ''),
+            warning: null
+        };
+    }
+
+    const available = checkAvailableMemory(estimatedBytes);
+    if (!available.hasEnough) {
+        return {
+            ok: false,
+            error: available.warning
+                || `Not enough memory for this operation (needs about ${estimatedMB} MB).`,
+            warning: null
+        };
+    }
+
+    return { ok: true, error: null, warning: available.warning || null };
+}
+
+// ============================================
 // TOOL-TO-TOOL FILE HANDOFF
 // ============================================
 

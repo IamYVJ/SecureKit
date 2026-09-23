@@ -13,9 +13,11 @@
     object-src 'none'; 
     base-uri 'self'; 
     form-action 'self'; 
-    frame-ancestors 'none';
 ">
     <title>Merge PDF - SecureKit</title>
+    <!-- Must run before any content is parsed. See frame-guard.js. -->
+    <script src="frame-guard.js"></script>
+
     <!-- Install / icons -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">

@@ -29,14 +29,9 @@ const JPEG_EMBED_FACTOR = 2;
 // embed anyway, so this only needs to be non-trivial, not accurate.
 const UNKNOWN_DIMENSION_FACTOR = 12;
 
-/*
- * A hard ceiling, checked separately from checkAvailableMemory(), because that
- * helper can only compare against a real heap limit on browsers exposing
- * performance.memory (Chromium). Everywhere else it never blocks, so without
- * this a single absurd image (20000x20000 PNG, ~4.8 GB) would sail through on
- * Firefox and Safari.
- */
-const MAX_ESTIMATED_MEMORY = 1024 * 1024 * 1024;
+// The ceiling itself lives in shared-utils.js, so every tool enforces the
+// same one. Without it a single absurd image (20000x20000 PNG, ~4.8 GB) would
+// sail through on any browser that does not expose performance.memory.
 
 // Page sizes in PDF points (1 inch = 72 pt)
 const PAGE_SIZES = {
@@ -292,25 +287,18 @@ async function addImages(files) {
         const estimatedMemory = combined.reduce(
             (sum, image) => sum + estimateImageMemory(image), 0);
 
-        if (estimatedMemory > MAX_ESTIMATED_MEMORY) {
-            const estimatedMB = (estimatedMemory / (1024 * 1024)).toFixed(0);
-            const limitMB = (MAX_ESTIMATED_MEMORY / (1024 * 1024)).toFixed(0);
-            showErrorMessage(
-                `These images need roughly ${estimatedMB} MB of memory to convert, `
-                + `over the ${limitMB} MB limit.\nConvert them in smaller batches, or `
-                + 'save large PNGs as JPG first - JPGs are embedded without being decoded.');
+        const budget = checkMemoryBudget(
+            estimatedMemory,
+            'Convert them in smaller batches, or save large PNGs as JPG first - '
+            + 'JPGs are embedded without being decoded.');
+
+        if (!budget.ok) {
+            showErrorMessage(budget.error);
             return;
         }
 
-        const memoryCheck = checkAvailableMemory(estimatedMemory);
-        if (!memoryCheck.hasEnough) {
-            showErrorMessage(memoryCheck.warning
-                || 'Not enough memory to convert these images. Try a smaller batch.');
-            return;
-        }
-
-        if (memoryCheck.warning) {
-            showWarningMessage(memoryCheck.warning);
+        if (budget.warning) {
+            showWarningMessage(budget.warning);
         }
 
         selectedImages.push(...valid);

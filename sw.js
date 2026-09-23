@@ -2,7 +2,7 @@
 // Caches every static asset so the app works offline after first visit.
 // Bump CACHE_VERSION when you update any vendored library or shipped file.
 
-const CACHE_VERSION = 'securekit-v13';
+const CACHE_VERSION = 'securekit-v15';
 
 const PRECACHE_URLS = [
     './',
@@ -28,6 +28,7 @@ const PRECACHE_URLS = [
     'secure-style.css',
     'validation-styles.css',
 
+    'frame-guard.js',
     'shared-utils.js',
     'file-size-validation.js',
     'merge.js',

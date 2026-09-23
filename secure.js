@@ -7,6 +7,20 @@ let selectedFiles = [];
 let isProcessing = false;
 let workflowStage = 'setup';
 let lastProtectionResult = null;
+/*
+ * Protecting a batch holds two things at once:
+ *
+ *   - every encrypted result, kept until the end so the files can be saved or
+ *     zipped together. AES-256 output is the same size as its input, so this
+ *     is the batch's total size.
+ *   - the working set of the file currently being encrypted. Measured on a
+ *     16.5 MB PDF, that peaked at 3.7x the file's size; 4 leaves some headroom.
+ *
+ * Only one file is encrypted at a time, so the working set is driven by the
+ * largest file rather than the total.
+ */
+const ENCRYPTION_WORKING_SET_FACTOR = 4;
+
 let securePdfModulePromise = null;
 let encryptionUnavailableReason = null;
 let cancellation = null;
@@ -251,6 +265,19 @@ function handleFileSelect(e) {
     }
 }
 
+/**
+ * Estimate peak memory for protecting a set of files.
+ *
+ * @param {Array} items - Objects carrying a `size` in bytes
+ * @returns {number} - Estimated peak bytes
+ */
+function estimateProtectionMemory(items) {
+    const total = items.reduce((sum, item) => sum + (item.size || 0), 0);
+    const largest = items.reduce((max, item) => Math.max(max, item.size || 0), 0);
+
+    return total + (largest * ENCRYPTION_WORKING_SET_FACTOR);
+}
+
 async function addFiles(files) {
     try {
         if (!Array.isArray(files) || files.length === 0) {
@@ -297,10 +324,27 @@ async function addFiles(files) {
         }
 
         if (validFiles.length > 0) {
-            const totalValidation = validateTotalSize([...selectedFiles, ...validFiles]);
+            const combined = [...selectedFiles, ...validFiles];
+
+            const totalValidation = validateTotalSize(combined);
             if (!totalValidation.valid) {
                 showErrorMessage(totalValidation.error);
                 return;
+            }
+
+            // The other tools check this too; encryption is just as hungry, and
+            // it holds every result until the batch finishes.
+            const budget = checkMemoryBudget(
+                estimateProtectionMemory(combined),
+                'Protect them in smaller batches.');
+
+            if (!budget.ok) {
+                showErrorMessage(budget.error);
+                return;
+            }
+
+            if (budget.warning) {
+                showWarningMessage(budget.warning);
             }
 
             selectedFiles.push(...validFiles);

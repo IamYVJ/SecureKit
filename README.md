@@ -26,6 +26,7 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 - **No uploads.** No backend, no servers. Open DevTools → Network and you'll see zero requests during processing.
 - **No third-party CDNs at runtime.** All dependencies (`pdf-lib`, `pdf.js`, `JSZip`) are vendored locally under `lib/`, and encryption uses the browser's own Web Crypto API. The site can run completely air-gapped.
 - **Locked-down CSP.** Every page declares `script-src 'self'` — even if a future change accidentally tried to load remote code, the browser would block it.
+- **Not embeddable.** SecureKit refuses to run inside someone else's frame, so the tools (the password fields especially) cannot be wrapped in a clickjacking overlay.
 - **Service-worker-backed offline mode.** After your first visit, the entire app works without an internet connection.
 - **Installable.** SecureKit is a PWA, so it can be installed to a desktop or home screen and launched in its own window — still with no backend and no network access required.
 - **Nothing lingers.** Sending a merged file straight to the Compress tool is a page navigation, so the file is parked in IndexedDB for the hop. It is deleted the moment the receiving tool picks it up, and any handoff left behind by an abandoned transfer is purged after 30 minutes.
@@ -45,9 +46,50 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 
 ---
 
+## Memory limits
+
+Everything runs in the page, so a batch that is too large crashes the tab rather
+than failing politely. Each tool estimates its peak before accepting files and
+refuses work it cannot finish, against a shared 1 GB ceiling in
+`shared-utils.js`.
+
+The estimates differ because the costs do:
+
+| Tool | What dominates |
+| --- | --- |
+| Image to PDF | Pixels, for PNG only. pdf-lib embeds a JPEG's compressed stream untouched, but decodes a PNG to raw RGBA - a 0.17 MB 3000x3000 PNG measured ~103 MB of heap. Dimensions are read from the file header, without decoding. |
+| Secure | The batch total, since every encrypted result is held until the end, plus roughly 4x the largest single file while it is being encrypted. |
+| Compress / Merge | File size, via the shared 3x multiplier. |
+| PDF to Image | Capped per page instead: the render scale is clamped so one page can never exceed a fixed pixel budget. |
+
+`performance.memory` only exists in Chromium, so the heap check is a refinement
+where it is available; the flat ceiling is what protects everyone else.
+
+---
+
 ## Browser requirements
 
 Tested on recent Chrome, Edge, Firefox, and Safari. Required APIs: `File`, `Blob`, `URL.createObjectURL`, `createImageBitmap`, `ServiceWorker` (for offline), Web Workers (for compress / PDF→image rendering).
+
+---
+
+## Framing and clickjacking
+
+`frame-ancestors` is ignored when a Content-Security-Policy arrives in a
+`<meta>` tag — it only works as a response header. The pages used to declare
+it there, which meant they were fully frameable in practice.
+
+`frame-guard.js` loads first in every page's `<head>`: if the page is framed it
+hides the document before anything paints, then tries to replace the framing
+page. A sandboxed frame can block that navigation, in which case the page just
+stays hidden.
+
+If you serve SecureKit somewhere you control the headers, add the real thing
+as well — it is enforced by the browser rather than by page script:
+
+```
+Content-Security-Policy: frame-ancestors 'none'
+```
 
 ---
 
@@ -64,6 +106,7 @@ SecureKit/
 ├── image-to-pdf.html / image-to-pdf.js
 ├── shared-utils.js          # Workflow, progress, drag-and-drop, downloads
 ├── file-size-validation.js  # File-size limits, toast messages, sanitization
+├── frame-guard.js           # Refuses to render inside a third-party frame
 ├── sw.js                    # Service worker (offline cache)
 ├── sw-register.js           # Service worker bootstrap
 ├── manifest.json            # Web app manifest (install metadata, shortcuts)
