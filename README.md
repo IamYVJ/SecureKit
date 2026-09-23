@@ -28,6 +28,7 @@ Live site: open `index.html` locally, or host the folder on any static web host 
 - **Locked-down CSP.** Every page declares `script-src 'self'` — even if a future change accidentally tried to load remote code, the browser would block it.
 - **Service-worker-backed offline mode.** After your first visit, the entire app works without an internet connection.
 - **Installable.** SecureKit is a PWA, so it can be installed to a desktop or home screen and launched in its own window — still with no backend and no network access required.
+- **Nothing lingers.** Sending a merged file straight to the Compress tool is a page navigation, so the file is parked in IndexedDB for the hop. It is deleted the moment the receiving tool picks it up, and any handoff left behind by an abandoned transfer is purged after 30 minutes.
 
 ---
 

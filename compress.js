@@ -137,40 +137,17 @@ setupDragAndDrop(uploadArea, (files) => {
     addFiles(files);
 }, { allowMultiple: true });
 
-function base64ToUint8Array(base64) {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-
-    return bytes;
-}
-
 async function importPendingCompressionFile() {
     try {
-        const rawPayload = sessionStorage.getItem(PENDING_COMPRESS_STORAGE_KEY);
-        if (!rawPayload) {
+        const file = await takeHandoffFile(PENDING_COMPRESS_STORAGE_KEY);
+        if (!file) {
             return;
         }
-
-        sessionStorage.removeItem(PENDING_COMPRESS_STORAGE_KEY);
-        const payload = JSON.parse(rawPayload);
-        if (!payload?.bytesBase64 || !payload?.filename) {
-            return;
-        }
-
-        const bytes = base64ToUint8Array(payload.bytesBase64);
-        const file = new File([bytes], payload.filename, {
-            type: payload.mimeType || 'application/pdf'
-        });
 
         await addFiles([file]);
-        showSuccessMessage(`Loaded "${payload.filename}" from the merge tool. Ready to compress.`);
+        showSuccessMessage(`Loaded "${file.name}" from the merge tool. Ready to compress.`);
     } catch (error) {
         console.error('Error importing pending compression file:', error);
-        sessionStorage.removeItem(PENDING_COMPRESS_STORAGE_KEY);
         showErrorMessage('Could not load the merged file into the compression tool automatically.');
     }
 }

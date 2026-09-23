@@ -426,32 +426,24 @@ async function saveMergedResult() {
     }
 }
 
-function uint8ArrayToBase64(bytes) {
-    let binary = '';
-    const chunkSize = 0x8000;
-
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = bytes.subarray(i, i + chunkSize);
-        binary += String.fromCharCode.apply(null, chunk);
-    }
-
-    return btoa(binary);
-}
-
-function compressMergedResult() {
+async function compressMergedResult() {
     if (!lastMergeResult) {
         showWarningMessage('No merged file is ready to compress yet.');
         return;
     }
 
     try {
-        const payload = {
-            filename: `${lastMergeResult.filename}.pdf`,
-            mimeType: 'application/pdf',
-            bytesBase64: uint8ArrayToBase64(lastMergeResult.bytes)
-        };
+        const file = new File([lastMergeResult.bytes], `${lastMergeResult.filename}.pdf`, {
+            type: 'application/pdf'
+        });
 
-        sessionStorage.setItem(PENDING_COMPRESS_STORAGE_KEY, JSON.stringify(payload));
+        // Only navigate once the file is actually stored; this page is about to
+        // be torn down, and with it anything still held in memory.
+        const stored = await storeHandoffFile(PENDING_COMPRESS_STORAGE_KEY, file);
+        if (!stored) {
+            throw new Error('Handoff storage refused the file');
+        }
+
         window.location.href = 'compress.html';
     } catch (error) {
         console.error('Error preparing merged file for compression:', error);

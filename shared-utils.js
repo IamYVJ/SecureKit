@@ -651,6 +651,230 @@ function setupStopButton(button, onStop) {
 }
 
 // ============================================
+// TOOL-TO-TOOL FILE HANDOFF
+// ============================================
+
+/*
+ * Passing a file from one tool page to another survives a full navigation, so
+ * it has to go through storage.
+ *
+ * sessionStorage was the original route, but it only holds strings: the file
+ * had to be base64-encoded (+33%) and then stored as UTF-16 (x2), costing about
+ * 2.67x the PDF's size, and building a single string of tens of millions of
+ * characters on the way. Measured in Chromium, that capped the handoff at a
+ * 36-38MB PDF, and other engines allow far less. Merge accepts 200MB of input,
+ * so a merged file can easily exceed it.
+ *
+ * IndexedDB stores a Blob natively: no encoding, no doubling, and a quota in
+ * the hundreds of MB. sessionStorage remains as a fallback for the rare case
+ * where IndexedDB is unavailable (blocked storage, some private modes).
+ */
+
+const HANDOFF_DB_NAME = 'securekit-handoff';
+const HANDOFF_STORE_NAME = 'files';
+
+/*
+ * Unlike sessionStorage, IndexedDB outlives the tab. A handoff takes seconds,
+ * so anything older than this was abandoned and should not be left sitting on
+ * someone's disk.
+ */
+const HANDOFF_MAX_AGE_MS = 30 * 60 * 1000;
+
+function openHandoffDatabase() {
+    return new Promise((resolve, reject) => {
+        let request;
+
+        try {
+            request = indexedDB.open(HANDOFF_DB_NAME, 1);
+        } catch (error) {
+            reject(error);
+            return;
+        }
+
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(HANDOFF_STORE_NAME)) {
+                db.createObjectStore(HANDOFF_STORE_NAME);
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => reject(new Error('IndexedDB open was blocked'));
+    });
+}
+
+function awaitTransaction(transaction) {
+    return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+    });
+}
+
+/**
+ * Drop handoff records left behind by a transfer that was never completed.
+ *
+ * @param {IDBDatabase} db - Open handoff database
+ */
+async function purgeStaleHandoffs(db) {
+    const cutoff = Date.now() - HANDOFF_MAX_AGE_MS;
+    const transaction = db.transaction(HANDOFF_STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(HANDOFF_STORE_NAME);
+
+    store.openCursor().onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (!cursor) {
+            return;
+        }
+        // A record without a timestamp predates this field; treat it as stale.
+        if (!cursor.value?.storedAt || cursor.value.storedAt < cutoff) {
+            cursor.delete();
+        }
+        cursor.continue();
+    };
+
+    await awaitTransaction(transaction);
+}
+
+/**
+ * Hand a file to another tool page.
+ *
+ * @param {string} key - Identifies the handoff
+ * @param {File} file - File to pass along
+ * @returns {Promise<boolean>} - True once the file is safely stored
+ */
+async function storeHandoffFile(key, file) {
+    try {
+        const db = await openHandoffDatabase();
+
+        try {
+            await purgeStaleHandoffs(db);
+
+            const transaction = db.transaction(HANDOFF_STORE_NAME, 'readwrite');
+            transaction.objectStore(HANDOFF_STORE_NAME).put({
+                file,
+                filename: file.name,
+                mimeType: file.type,
+                storedAt: Date.now()
+            }, key);
+
+            // Resolves only once the write is durable, so the caller can
+            // navigate away immediately afterwards without losing it.
+            await awaitTransaction(transaction);
+            return true;
+        } finally {
+            db.close();
+        }
+    } catch (error) {
+        console.warn('IndexedDB handoff unavailable, falling back to sessionStorage:', error);
+        return storeHandoffFileFallback(key, file);
+    }
+}
+
+/**
+ * Collect a file handed over by another tool page, and clear it.
+ *
+ * @param {string} key - Identifies the handoff
+ * @returns {Promise<File|null>} - The file, or null if there is nothing waiting
+ */
+async function takeHandoffFile(key) {
+    try {
+        const db = await openHandoffDatabase();
+
+        try {
+            const readTransaction = db.transaction(HANDOFF_STORE_NAME, 'readonly');
+            const request = readTransaction.objectStore(HANDOFF_STORE_NAME).get(key);
+            await awaitTransaction(readTransaction);
+
+            const record = request.result;
+
+            if (record) {
+                // Read once: the file is consumed, and nothing is left behind.
+                const deleteTransaction = db.transaction(HANDOFF_STORE_NAME, 'readwrite');
+                deleteTransaction.objectStore(HANDOFF_STORE_NAME).delete(key);
+                await awaitTransaction(deleteTransaction);
+            }
+
+            await purgeStaleHandoffs(db);
+
+            if (record?.file) {
+                return new File([record.file], record.filename || 'document.pdf', {
+                    type: record.mimeType || 'application/pdf'
+                });
+            }
+        } finally {
+            db.close();
+        }
+    } catch (error) {
+        console.warn('Could not read IndexedDB handoff:', error);
+    }
+
+    // Either IndexedDB is unavailable, or the file was stored by the fallback.
+    return takeHandoffFileFallback(key);
+}
+
+/**
+ * sessionStorage fallback. Size-limited by base64 and UTF-16 overhead, so it is
+ * only reached when IndexedDB cannot be used at all.
+ */
+function storeHandoffFileFallback(key, file) {
+    return file.arrayBuffer().then((buffer) => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 0x8000;
+
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+
+        sessionStorage.setItem(key, JSON.stringify({
+            filename: file.name,
+            mimeType: file.type,
+            bytesBase64: btoa(binary)
+        }));
+
+        return true;
+    }).catch((error) => {
+        console.error('sessionStorage handoff failed:', error);
+        return false;
+    });
+}
+
+function takeHandoffFileFallback(key) {
+    try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) {
+            return null;
+        }
+
+        sessionStorage.removeItem(key);
+        const payload = JSON.parse(raw);
+        if (!payload?.bytesBase64 || !payload?.filename) {
+            return null;
+        }
+
+        const binary = atob(payload.bytesBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+
+        return new File([bytes], payload.filename, {
+            type: payload.mimeType || 'application/pdf'
+        });
+    } catch (error) {
+        console.error('Could not read sessionStorage handoff:', error);
+        try {
+            sessionStorage.removeItem(key);
+        } catch (removeError) {
+            console.warn('Could not clear sessionStorage handoff:', removeError);
+        }
+        return null;
+    }
+}
+
+// ============================================
 // ACCESSIBILITY HELPERS
 // ============================================
 
